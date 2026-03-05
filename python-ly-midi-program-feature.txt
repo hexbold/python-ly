@@ -1,0 +1,181 @@
+PYTHON-LY MIDI PROGRAM FEATURE
+==============================
+
+Date: 2026-01-17
+Affected package: python-ly (frescobaldi/python-ly)
+Type: Feature enhancement (not a bug fix)
+
+THE PROBLEM
+-----------
+When exporting LilyPond to MusicXML and importing into DAWs like Logic Pro,
+no MIDI instruments are assigned. The user must manually assign instruments
+to each track.
+
+This happens because python-ly exports the instrument NAME but not the
+General MIDI PROGRAM NUMBER.
+
+Before (what python-ly exported):
+    <midi-instrument id="P1-I1">
+      <midi-channel>1</midi-channel>
+      <midi-name>violin</midi-name>
+    </midi-instrument>
+
+After (what DAWs need):
+    <midi-instrument id="P1-I1">
+      <midi-channel>1</midi-channel>
+      <midi-program>41</midi-program>      <-- ADDED
+      <midi-name>violin</midi-name>
+    </midi-instrument>
+
+THE SOLUTION
+------------
+Two files were modified:
+
+1. ly/musicxml/midi_sound_map.py
+   - Added midi_program_map dictionary
+   - Maps LilyPond instrument names to General MIDI program numbers (1-128)
+   - Example: 'violin': 41, 'trumpet': 57, 'timpani': 48
+
+2. ly/musicxml/create_musicxml.py
+   - Import midi_program_map
+   - In create_part(), add <midi-program> element when instrument is known
+
+CODE CHANGES
+------------
+
+File: ly/musicxml/midi_sound_map.py
+Add after existing midi_sound_map:
+
+    midi_program_map = {
+        'acoustic grand': 1,
+        'violin': 41,
+        'viola': 42,
+        'cello': 43,
+        'contrabass': 44,
+        'timpani': 48,
+        'trumpet': 57,
+        'trombone': 58,
+        'tuba': 59,
+        'french horn': 61,
+        # ... (full General MIDI list)
+    }
+
+File: ly/musicxml/create_musicxml.py
+Change import:
+    from .midi_sound_map import midi_sound_map, midi_program_map
+
+In create_part(), after midi-channel, add:
+    if midi in midi_program_map:
+        midiprog = etree.SubElement(midiinstr, "midi-program")
+        midiprog.text = str(midi_program_map[midi])
+
+GENERAL MIDI PROGRAM NUMBERS
+----------------------------
+Reference: https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
+
+Common orchestral instruments:
+  41 = Violin
+  42 = Viola
+  43 = Cello
+  44 = Contrabass
+  47 = Orchestral Harp
+  48 = Timpani
+  53 = Choir Aahs
+  57 = Trumpet
+  58 = Trombone
+  59 = Tuba
+  61 = French Horn
+  69 = Oboe
+  71 = Bassoon
+  72 = Clarinet
+  74 = Flute
+
+TESTING
+-------
+MusicXML output verification:
+Before: No <midi-program> element in output
+After:  <midi-program> element added with correct GM program number
+
+Example output verification:
+  $ grep "midi-program" Warhammer-Orchestral.xml
+  <midi-program>48</midi-program>   (timpani)
+  <midi-program>57</midi-program>   (trumpet)
+  <midi-program>41</midi-program>   (violin)
+  ...
+
+LOCAL INSTALLATION
+------------------
+The feature is implemented in:
+  /Users/lukasbold/Documents/Programming/Arpegiora/ly/
+
+IMPORTANT: Scripts that use python-ly must add the project root to sys.path
+BEFORE importing ly, otherwise the system-installed python-ly (without this
+fix) will be used instead:
+  _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+  sys.path.insert(0, _project_root)
+
+This is because Python sets sys.path[0] to the script's directory (e.g.
+scripts/), not the CWD, when running a script file.
+
+EXPORT PIPELINE (ly_export.py)
+------------------------------
+Full pipeline script: scripts/ly_export.py
+
+Two engines:
+  MuseScore (default):  LilyPond → flatten → MusicXML → MuseScore CLI → MP3/WAV
+  FluidSynth:           LilyPond MIDI → FluidSynth + SoundFont → WAV
+
+Usage:
+  python3 scripts/ly_export.py piece.ly                # -Score.musicxml + -Score.mp3
+  python3 scripts/ly_export.py piece.ly --wav           # -Score.wav
+  python3 scripts/ly_export.py piece.ly --no-mxl        # MP3 only, no MusicXML
+  python3 scripts/ly_export.py piece.ly --parts         # + per-instrument audio
+  python3 scripts/ly_export.py piece.ly --fluidsynth    # -Score.wav via FluidSynth+TOH
+  python3 scripts/ly_export.py piece.ly --all           # everything: MusicXML + MP3 + WAV + parts + FluidSynth
+
+Output naming follows PDF convention:
+  {Name}-Score.mp3       Full score (like {Name}-Score.pdf)
+  {Name}-Cello.mp3       Individual part (like {Name}-Cello.pdf)
+
+Parts logic (--parts):
+  - 1 instrument  → skipped (Score = Part, no redundant export)
+  - N instruments → exports parts, but only for instruments with actual notes
+                    (empty/rest-only parts are skipped via has_notes() check)
+
+Flattening (scripts/ly_to_musicxml.py):
+  - Resolves dot-notation bar variables (vc.1, upper.2, etc.)
+  - Extracts time signature, key, tempo from source (no hardcoding)
+  - Handles pickup/Auftakt (\partial) via {prefix}Pickup variables
+  - Cleans tremolo notation (:32) not supported by python-ly
+  - Removes StaffGroup/DrumStaff not supported by python-ly
+
+SUBMITTING UPSTREAM
+-------------------
+This would be a feature enhancement PR to:
+https://github.com/frescobaldi/python-ly
+
+PR title: "Add MIDI program numbers to MusicXML export"
+PR label: enhancement
+
+Benefits:
+- DAWs can auto-assign correct instruments on import
+- No manual instrument selection needed
+- Better interoperability with Logic Pro, Cubase, MuseScore, etc.
+
+STATUS
+------
+- Implemented locally: YES
+- Tested XML output: YES (correct <midi-program> elements generated)
+- Tested with Logic Pro: Logic Pro ignores <midi-program> on MusicXML import
+- Tested with MuseScore 4: YES (correct instrument assigned, audio exported)
+- Tested with other DAWs: NOT YET (try Dorico, Finale)
+- PR submitted: PENDING (waiting for chord fix PR #171 to be accepted first)
+
+KNOWN ISSUES
+------------
+- MuseScore CLI shows "Instrument folder environment variable not defined!"
+  warning but still exports audio correctly using MS Basic soundfont.
+  Muse Sounds requires MuseSampler config at:
+    /Library/Application Support/com.muse.MuseSampler/.config
+  pointing to instrument folder at:
+    ~/Library/Application Support/Muse Hub/Downloads/Instruments/
