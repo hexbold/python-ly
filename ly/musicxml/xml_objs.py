@@ -96,8 +96,8 @@ class IterateXmlObjs():
 
     def iterate_part(self, part):
         """The part is iterated."""
-        last_bar = part.last_bar()
-        if last_bar:
+        if part.barlist:
+            last_bar = part.barlist[-1]
             last_bar_objs = last_bar.obj_list
             part.set_first_bar(self.divisions)
             self.musxml.create_part(part.name, part.abbr, part.midi)
@@ -457,12 +457,6 @@ class ScorePart(ScoreSection):
                     section_bar.obj_list.append(glob_barattr)
             section.barlist.append(section_bar)
         return section
-
-    def last_bar(self):
-        """Returns the last Bar object in the score, or None if the score is empty."""
-        for obj in reversed(self.barlist):
-            if isinstance(obj, Bar):
-                return obj
 
 
 class Bar():
