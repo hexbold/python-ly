@@ -1,0 +1,91 @@
+PYTHON-LY BUG: TEMPO + SLURS → CRASH
+======================================
+
+Datum: 2026-02-21
+Betroffenes Paket: python-ly (frescobaldi/python-ly)
+Status: WORKAROUND in unseren Scripts, upstream-Bug NICHT gefixt
+
+DER BUG
+-------
+python-ly stürzt mit `IndexError: pop from empty list` ab, wenn folgende
+Kombination in einer LilyPond-Datei vorkommt:
+
+1. \tempo in den Stimmen (z.B. \tempo 4 = 58)
+2. Slurs (Bindebögen) im ERSTEN Takt
+3. PianoStaff + mindestens ein zusätzlicher Staff (z.B. Cello)
+
+Der Crash tritt bei der MusicXML-Konvertierung auf:
+  python3 -m ly musicxml input.ly
+
+REPRODUKTION
+------------
+Diese Kombination crasht:
+
+  \score {
+    <<
+      \new PianoStaff <<
+        \new Staff {
+          \tempo 4 = 58
+          <a c' f'>2( <a c' e'>4 <a c' f'>4)   % Slur im 1. Takt → CRASH
+        }
+        \new Staff { f,2( <c f a>2) }
+      >>
+      \new Staff { r1 }                          % Zusätzlicher Staff
+    >>
+    \layout { }
+  }
+
+Diese Kombination funktioniert (keine Slurs im 1. Takt):
+
+  \score {
+    <<
+      \new PianoStaff <<
+        \new Staff {
+          \tempo 4 = 58
+          <a c' f'>2 <a c' e'>4 <a c' f'>4      % Kein Slur → OK (aber anderer Bug!)
+        }
+        \new Staff { f,2 <c f a>2 }
+      >>
+      \new Staff { r1 }
+    >>
+    \layout { }
+  }
+
+FEHLERMELDUNG
+-------------
+  Traceback (most recent call last):
+    ...
+    File ".../ly/musicxml/ly2xml_mediator.py", line XXX, in ...
+  IndexError: pop from empty list
+
+Hinweis: python-ly implementiert Slurs sowieso nicht in MusicXML
+("Slur not implemented!" Warning), daher gehen keine Informationen verloren.
+
+ROOT CAUSE
+----------
+python-ly verarbeitet \tempo fehlerhaft wenn direkt danach Slurs
+im ersten Takt folgen. Der interne Parser-Zustand wird durch \tempo
+so verändert, dass der Slur-Parser auf einen leeren Stack zugreift.
+
+WORKAROUND (IMPLEMENTIERT)
+--------------------------
+In scripts/ly_to_musicxml.py:
+  1. \tempo wird NICHT in die flattened LilyPond-Datei geschrieben
+  2. python-ly erzeugt MusicXML ohne Tempo → kein Crash
+  3. Tempo wird nachträglich als XML-Element in die MusicXML injiziert
+     (inject_tempo_into_musicxml() Funktion)
+  4. MuseScore erhält die fertige MusicXML mit korrektem Tempo
+
+Dadurch können Slurs im 1. Takt bleiben.
+
+UPSTREAM-FIX NÖTIG
+-------------------
+Der Bug liegt in ly/musicxml/ly2xml_mediator.py im python-ly Paket.
+Für einen vollständigen Fix müsste der Bug direkt in python-ly
+gefixt werden: https://github.com/frescobaldi/python-ly
+
+ZUSAMMENHANG MIT ANDEREN BUGS
+------------------------------
+- python-ly-tempo-chord-corruption-bug.txt (Tempo + Akkorde → korrupte MusicXML)
+- python-ly-musicxml-chord-fix.txt (Bar-Duration-Bug bei Akkorden)
+- python-ly-musicxml-chord-staff-fix.txt (Staff-Zuweisung + Bar-Referenz)

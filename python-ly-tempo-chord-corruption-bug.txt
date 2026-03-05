@@ -1,0 +1,83 @@
+PYTHON-LY BUG: TEMPO + AKKORDE → KORRUPTE MUSICXML
+=====================================================
+
+Datum: 2026-02-21
+Betroffenes Paket: python-ly (frescobaldi/python-ly)
+Status: WORKAROUND in unseren Scripts, upstream-Bug NICHT gefixt
+
+DER BUG
+-------
+Wenn \tempo und Akkorde im ERSTEN Takt zusammen vorkommen, erzeugt
+python-ly korrupte MusicXML:
+- Falsche Notendauern (Halbe → Viertel)
+- Falsche Tonhöhen (Akkordtöne werden vertauscht)
+- Cello bekommt <staff>2</staff> statt <staff>1</staff>
+
+BEWEIS (MINIMAL-TEST)
+---------------------
+Mit \tempo:
+  \tempo 4 = 58
+  <a c' f'>2 <a c' e'>4 <a c' f'>4
+  → MusicXML: <a c' e'>4  (FALSCH: E statt F, Viertel statt Halbe)
+
+Ohne \tempo:
+  <a c' f'>2 <a c' e'>4 <a c' f'>4
+  → MusicXML: <a c' f'>2  (KORREKT)
+
+Mit \tempo + Pause im 1. Takt, Akkorde im 2. Takt:
+  \tempo 4 = 58
+  r1 | <a c' f'>2 <a c' e'>4 <a c' f'>4
+  → MusicXML: KORREKT
+
+ROOT CAUSE
+----------
+python-ly verarbeitet \tempo fehlerhaft wenn direkt danach Akkorde
+im ersten Takt folgen. Der interne Parser-Zustand wird durch \tempo
+so verändert, dass nachfolgende Akkord-Events falsch interpretiert werden.
+
+Wenn der erste Takt eine Pause enthält, hat der Parser genug "Raum" um
+\tempo korrekt zu verarbeiten, bevor die Akkorde kommen.
+
+WARUM DIE DREI SÄTZE SICH UNTERSCHIEDLICH VERHALTEN
+----------------------------------------------------
+Satz I:   \tempo 4 = 76 + Pause im 1. Takt      → FUNKTIONIERT
+Satz II:  \tempo 4 = 58 + Akkorde im 1. Takt     → BUG
+Satz III: \tempo 4. = 126 (nicht in Flattened)    → FUNKTIONIERT
+
+WORKAROUND (IMPLEMENTIERT)
+--------------------------
+In scripts/ly_to_musicxml.py:
+  1. \tempo wird NICHT in die flattened LilyPond-Datei geschrieben
+  2. python-ly erzeugt MusicXML ohne Tempo → korrekte Noten
+  3. Tempo wird nachträglich als XML-Element in die MusicXML injiziert
+     (inject_tempo_into_musicxml() Funktion)
+  4. MuseScore erhält die fertige MusicXML mit korrektem Tempo
+
+UPSTREAM-FIX NÖTIG
+-------------------
+Der Bug liegt in ly/musicxml/ly2xml_mediator.py im python-ly Paket.
+Für einen vollständigen Fix müsste der Bug direkt in python-ly
+gefixt werden: https://github.com/frescobaldi/python-ly
+
+ZWEITER BUG: extract_tempo() NIMMT FALSCHES TEMPO (2026-02-22)
+---------------------------------------------------------------
+Problem: extract_tempo() nutzte re.search() auf dem GESAMTEN .ly-Quelltext.
+Wenn ein Mid-Piece Tempo-Wechsel (z.B. \tempo "Presto" 4. = 138 in T.167)
+VOR dem \midi { \tempo 4. = 108 } Block steht, wurde das Presto-Tempo
+gefunden und in die MusicXML injiziert — statt des Basis-Tempos.
+
+Effekt: Das gesamte Stueck spielte mit 138 statt 108 BPM.
+
+Fix in scripts/ly_to_musicxml.py, extract_tempo():
+  1. Zuerst innerhalb von \midi { ... } Bloecken suchen (= autoritatives Tempo)
+  2. Nur als Fallback: erstes \tempo in der gesamten Datei
+
+Aenderung:
+  - Alt: m = re.search(tempo_re, content)
+  - Neu: Zuerst \midi-Block extrahieren, dort suchen, dann Fallback
+
+ZUSAMMENHANG MIT ANDEREN BUGS
+------------------------------
+- python-ly-tempo-slur-crash-bug.txt (Tempo + Slurs → Crash)
+- python-ly-musicxml-chord-fix.txt (Bar-Duration-Bug bei Akkorden)
+- python-ly-musicxml-chord-staff-fix.txt (Staff-Zuweisung + Bar-Referenz)
