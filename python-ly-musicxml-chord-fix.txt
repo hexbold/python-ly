@@ -1,0 +1,105 @@
+PYTHON-LY MUSICXML CHORD BUG FIX
+=================================
+
+Date: 2026-01-17 (updated 2026-01-26)
+Affected package: python-ly (frescobaldi/python-ly)
+GitHub issue: https://github.com/frescobaldi/python-ly/issues/171
+Branch name: fix-musicxml-chord-bar-duration
+
+THE BUG
+-------
+When exporting LilyPond files to MusicXML, chord notation causes measure
+boundaries to be lost. A 3-bar piece becomes 2 bars.
+
+Two variants affected:
+
+1. Explicit chords:
+   c''1 | <d'' f'' a''>1 | e''1    <- Should be 3 measures, was 2
+
+2. Duration shorthand after chords (from issue #171):
+   \time 3/4
+   <e f>4 4 4 | 4 4 8 r | r4 a g   <- Should be 3 measures, was 2
+
+ROOT CAUSE
+----------
+In ly/musicxml/ly2xml_mediator.py, two functions set chord durations but
+never increment the bar duration counter:
+
+1. new_chordbase() - handles explicit chord notation <c e g>
+2. copy_prev_chord() - handles duration shorthand after chords (4 4)
+
+Bar boundaries are calculated by accumulating note durations. When the
+total reaches the time signature value (e.g., 4 beats in 4/4), a new
+measure is created. Chords were not adding their duration to this counter.
+
+THE FIX
+-------
+
+FIX 1: new_chordbase() - line 562-567
+
+Original:
+    def new_chordbase(self, note, duration, rel=False):
+        self.current_note = self.create_barnote_from_note(note)
+        self.current_note.set_duration(duration)
+        self.current_lynote = note
+        self.check_current_note(rel)
+
+Fixed:
+    def new_chordbase(self, note, duration, rel=False):
+        self.current_note = self.create_barnote_from_note(note)
+        self.current_note.set_duration(duration)
+        self.current_lynote = note
+        self.check_current_note(rel)
+        self.increase_bar_dura(duration)  # FIX: count chord duration
+
+FIX 2: copy_prev_chord() - line 587-604
+
+Original:
+    def copy_prev_chord(self, duration):
+        ...
+        self.tied = False
+
+Fixed:
+    def copy_prev_chord(self, duration):
+        ...
+        self.tied = False
+        self.increase_bar_dura(duration)  # FIX: count repeated chord duration
+
+LOCAL INSTALLATION
+------------------
+The fix is applied locally in this project:
+  /Users/lukasbold/Documents/Programming/Arpegiora/ly/
+
+When running python3 -m ly from this directory, Python uses the local
+fixed copy instead of the system package.
+
+To use from other directories:
+  PYTHONPATH="/Users/lukasbold/Documents/Programming/Arpegiora:$PYTHONPATH" python3 -m ly musicxml file.ly
+
+TESTING
+-------
+Test files:
+- test-issue-171.ly   (shorthand notation)
+- test-issue-171b.ly  (explicit chords)
+- test-original.ly    (original example)
+
+All tests: 3 measures expected, 3 measures output
+
+Chord types tested:
+- 2-note chords: FIXED
+- 3-note chords: FIXED
+- Chords with tremolo: FIXED
+- Duration shorthand after chord: FIXED
+
+SUBMITTING UPSTREAM
+-------------------
+To fix this for everyone, submit a PR to:
+https://github.com/frescobaldi/python-ly
+
+Steps:
+1. Fork https://github.com/frescobaldi/python-ly
+2. Clone fork locally
+3. Create branch: git checkout -b fix-musicxml-chord-bar-duration
+4. Apply both fixes to ly/musicxml/ly2xml_mediator.py
+5. Commit with message referencing "Fixes #171"
+6. Push and create PR

@@ -567,7 +567,8 @@ class Mediator():
         self.current_note.set_duration(duration)
         self.current_lynote = note
         self.check_current_note(rel)
-        self.increase_bar_dura(duration)
+        self._chord_bar = self.bar  # Save bar ref before increase_bar_dura() may trigger new_bar()
+        self.increase_bar_dura(duration)  # FIX: count chord duration for bar boundaries
 
     def new_chordnote(self, note, rel):
         chord_note = self.create_barnote_from_note(note)
@@ -584,7 +585,9 @@ class Mediator():
         chord_note.set_octave(p.octave + 3)
         self.prev_chord_pitch = p
         chord_note.chord = True
-        self.bar.add(chord_note)
+        if self.staff:
+            chord_note.set_staff(self.staff)
+        self._chord_bar.add(chord_note)  # Use saved bar ref (not self.bar which may have advanced)
         return chord_note
 
     def copy_prev_chord(self, duration):
@@ -604,7 +607,7 @@ class Mediator():
                 cn.set_tie('stop')
             self.bar.add(cn)
         self.tied = False
-        self.increase_bar_dura(duration)
+        self.increase_bar_dura(duration)  # FIX: count repeated chord duration for bar boundaries
 
     def clear_chord(self):
         self.q_chord = self.current_chord

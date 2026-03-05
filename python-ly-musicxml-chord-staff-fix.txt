@@ -1,0 +1,143 @@
+PYTHON-LY MUSICXML CHORD STAFF + BAR REFERENCE BUG FIX
+========================================================
+
+Date: 2026-02-18
+Affected package: python-ly (frescobaldi/python-ly)
+Related to: python-ly-musicxml-chord-fix.txt (bar duration fix)
+Branch name: fix-musicxml-chord-staff-and-bar
+
+PREREQUISITE
+------------
+This fix builds on top of the chord bar duration fix (see python-ly-musicxml-chord-fix.txt).
+That fix added increase_bar_dura() calls to new_chordbase() and copy_prev_chord().
+However, it introduced two new issues described below.
+
+THE BUGS
+--------
+When exporting LilyPond files with chords in multi-staff parts (e.g. PianoStaff)
+to MusicXML, MuseScore reports "corrupted" files with "Incomplete measure" errors.
+
+Two bugs in ly/musicxml/ly2xml_mediator.py:
+
+BUG 1: Missing <staff> element on chord notes
+  new_chordnote() never calls set_staff() on chord notes. In a PianoStaff, each
+  note needs a <staff> element (1 or 2) so MuseScore knows which staff the note
+  belongs to. Regular notes get this via check_current_note() (line 505-506), but
+  chord notes bypass that method.
+
+  Symptom: MuseScore imports the file but reports corruption. Notes may appear on
+  the wrong staff.
+
+BUG 2: Chord notes added to wrong measure after bar boundary
+  When increase_bar_dura() (added by the previous chord fix) triggers new_bar()
+  at a bar boundary, self.bar advances to the NEXT measure. Any subsequent
+  new_chordnote() calls (for additional notes in the same chord) use self.bar.add()
+  which adds them to the NEW measure — with a <chord/> flag but no preceding
+  non-chord note. This creates an orphaned chord note as the first element of a
+  measure, which is invalid MusicXML.
+
+  Symptom: MuseScore reports "Incomplete measure" errors. Measures have wrong
+  note counts.
+
+  Example: In 3/4 time, <c'' e''>2. spans the full measure. new_chordbase()
+  processes c'', calls increase_bar_dura() which fills the bar and triggers
+  new_bar(). Then new_chordnote() for e'' adds it to the NEW bar instead of
+  the bar where c'' is.
+
+ROOT CAUSE
+----------
+In ly/musicxml/ly2xml_mediator.py:
+
+1. new_chordnote() (line ~569-585) never calls set_staff() — unlike
+   check_current_note() which does it for regular notes at line 505-506.
+
+2. new_chordbase() calls increase_bar_dura() which can trigger new_bar(),
+   advancing self.bar. Then new_chordnote() uses self.bar.add() which
+   references the wrong (new) bar.
+
+THE FIX
+-------
+
+FIX 0: Initialize _chord_bar in __init__()
+
+Add after self.prev_tremolo = 8:
+    self._chord_bar = None
+
+FIX 1: new_chordbase() — save bar reference before increase_bar_dura()
+
+Original (after previous chord-duration fix):
+    def new_chordbase(self, note, duration, rel=False):
+        self.current_note = self.create_barnote_from_note(note)
+        self.current_note.set_duration(duration)
+        self.current_lynote = note
+        self.check_current_note(rel)
+        self.increase_bar_dura(duration)
+
+Fixed:
+    def new_chordbase(self, note, duration, rel=False):
+        self.current_note = self.create_barnote_from_note(note)
+        self.current_note.set_duration(duration)
+        self.current_lynote = note
+        self.check_current_note(rel)
+        self._chord_bar = self.bar          # Save bar ref before possible new_bar()
+        self.increase_bar_dura(duration)
+
+FIX 2: new_chordnote() — set staff + use saved bar reference
+
+Original:
+    def new_chordnote(self, note, rel):
+        chord_note = self.create_barnote_from_note(note)
+        ...
+        chord_note.chord = True
+        self.bar.add(chord_note)
+        return chord_note
+
+Fixed:
+    def new_chordnote(self, note, rel):
+        chord_note = self.create_barnote_from_note(note)
+        ...
+        chord_note.chord = True
+        if self.staff:
+            chord_note.set_staff(self.staff)
+        self._chord_bar.add(chord_note)     # Use saved bar ref, not self.bar
+        return chord_note
+
+LOCAL INSTALLATION
+------------------
+The fix is applied locally in this project:
+  /Users/lukasbold/Documents/Programming/Arpegiora/ly/
+
+TESTING
+-------
+Test script: tests/chord-staff-bug/test_chords.py
+Test LilyPond: tests/chord-staff-bug/test-chords.ly
+
+Tests verify:
+- All chord notes have <staff> elements (BUG 1 fix)
+- No orphaned chord notes at measure start (BUG 2 fix)
+- Correct measure count preserved
+
+Additional verification:
+- Full Cello+Piano composition (Für Julia, 37 bars with many chords) exports
+  to MusicXML without MuseScore corruption warnings
+- MuseScore CLI successfully converts the MusicXML to MP3
+
+SUBMITTING UPSTREAM
+-------------------
+To fix this for everyone, submit a PR to:
+https://github.com/frescobaldi/python-ly
+
+Steps:
+1. Fork https://github.com/frescobaldi/python-ly (or use existing fork)
+2. Clone fork locally
+3. Create branch: git checkout -b fix-musicxml-chord-staff-and-bar
+4. Apply all 3 changes to ly/musicxml/ly2xml_mediator.py:
+   - Add self._chord_bar = None in __init__()
+   - Add self._chord_bar = self.bar in new_chordbase() before increase_bar_dura()
+   - In new_chordnote(): add staff assignment + change self.bar.add() to self._chord_bar.add()
+5. Commit with descriptive message
+6. Push and create PR
+
+Note: This fix depends on the previous chord bar duration fix (increase_bar_dura
+calls in new_chordbase and copy_prev_chord). Both fixes should be in the same PR
+or the bar duration fix should be merged first.
