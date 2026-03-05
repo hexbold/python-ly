@@ -1,0 +1,70 @@
+PYTHON-LY BUG: STAFF-ZÄHLER WIRD NICHT ZURÜCKGESETZT ZWISCHEN PARTS
+=====================================================================
+
+Datum: 2026-02-21
+Betroffenes Paket: python-ly (frescobaldi/python-ly)
+Status: GEFIXT lokal in ly/musicxml/ly2xml_mediator.py
+
+DER BUG
+-------
+Wenn ein PianoStaff (2 Systeme) vor einem einzelnen Staff (z.B. Cello) steht,
+erbt der Cello-Part die Staff-Nummer 2 vom PianoStaff.
+
+Ergebnis in MusicXML:
+- Cello-Noten haben <staff>2</staff> statt <staff>1</staff> (oder gar kein <staff>)
+- Cello-Clef hat <clef number="2"> statt <clef number="1">
+
+Auswirkung:
+- MuseScore zeigt den Cello-Part mit doppeltem System an
+- Akkordtöne werden vom falschen MIDI-Instrument abgespielt
+  (z.B. Cello-Sound in der Piano-MP3)
+
+REPRODUKTION
+------------
+Jede LilyPond-Datei mit PianoStaff + nachfolgendem Staff:
+
+  \score {
+    <<
+      \new PianoStaff <<
+        \new Staff { c'1 }
+        \new Staff { c1 }
+      >>
+      \new Staff { c1 }          % Dieser Staff bekommt staff=2
+    >>
+    \layout { }
+  }
+
+ROOT CAUSE
+----------
+In ly/musicxml/ly2xml_mediator.py, Klasse Mediator:
+
+1. __init__() setzt self.staff = 0
+2. PianoStaff-Verarbeitung ruft set_staffnr(1) für Staff 1, set_staffnr(2) für Staff 2
+   → self.staff = 2 nach dem PianoStaff
+3. PianoStaff-Ende (lymus2musxml.py): piano_staff=0 und voice=1 werden zurückgesetzt,
+   aber self.staff wird NICHT zurückgesetzt
+4. new_part() für den Cello-Staff resettet self.staff NICHT
+5. add_staff_id() speichert self.staff=2 für den Cello-Staff
+6. Alle Cello-Noten und Clefs bekommen staff=2
+
+DER FIX
+-------
+Eine Zeile in new_part() (ly/musicxml/ly2xml_mediator.py, Zeile 152):
+
+  def new_part(self, pid=None, to_part=None, piano=False):
+      self.staff = 0    # ← HINZUGEFÜGT: Reset staff counter for new part
+      if piano:
+          ...
+
+Warum hier:
+- Jeder new_part()-Aufruf startet einen neuen MusicXML-Part
+- Staff-Nummern sind Part-relativ, nicht global
+- Für PianoStaff wird set_staffnr(1/2) danach explizit aufgerufen → Reset stört nicht
+- Für standalone Staves bleibt self.staff=0 → kein <staff>-Element → korrekt
+
+ZUSAMMENHANG MIT ANDEREN BUGS
+------------------------------
+- python-ly-tempo-chord-corruption-bug.txt (Tempo + Akkorde → korrupte MusicXML)
+- python-ly-tempo-slur-crash-bug.txt (Tempo + Slurs → Crash)
+- python-ly-musicxml-chord-fix.txt (Bar-Duration-Bug bei Akkorden)
+- python-ly-musicxml-chord-staff-fix.txt (Staff-Zuweisung + Bar-Referenz in Akkorden)

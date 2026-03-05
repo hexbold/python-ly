@@ -76,6 +76,7 @@ class Mediator():
         self.ongoing_dashes = False
         self.octdiff = 0
         self.prev_tremolo = 8
+        self._chord_bar = None
         self.tupl_dur = 0
         self.tupl_sum = 0
         self.slur_stack = []
@@ -149,6 +150,7 @@ class Mediator():
         self.group.set_bracket(get_group_symbol(system_start))
 
     def new_part(self, pid=None, to_part=None, piano=False):
+        self.staff = 0
         if piano:
             self.part = xml_objs.ScorePart(2, pid, to_part)
         else:
