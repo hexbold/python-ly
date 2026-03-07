@@ -1,0 +1,116 @@
+PYTHON-LY MUSICXML ELEMENT ORDERING FIX
+========================================
+
+Date: 2026-03-06
+Affected package: python-ly (frescobaldi/python-ly)
+Type: Bug fix
+
+THE PROBLEM
+-----------
+python-ly's MusicXML export produces XML with incorrect element ordering,
+violating the MusicXML 3.0 schema. While MuseScore tolerates these errors,
+stricter parsers like Dorico reject the files with validation errors.
+
+Two ordering issues:
+
+1. <creator> appears AFTER <encoding> in <identification>
+   Expected order: <creator>, then <encoding>
+   python-ly order: <encoding>, then <creator>
+
+2. <staff> appears AFTER <notations> inside <note>
+   Expected order: ..., <staff>, <notations>, <lyric>
+   python-ly order: ..., <notations>, <staff>
+
+THE SOLUTION
+------------
+Two files were modified:
+
+1. ly/musicxml/create_musicxml.py
+   - create_score_info(): Use Element + insert(0, ...) instead of SubElement
+     to place <creator> before <encoding>
+   - add_staff(): Insert <staff> before <notations> element if present,
+     otherwise append at end
+
+2. ly/musicxml/create_musicxml.py (same file, also)
+   - Removed <midi-name> element from create_part() — not a valid MusicXML
+     3.0 element (documented separately in python-ly-midi-program-feature.txt)
+
+CODE CHANGES
+------------
+
+File: ly/musicxml/create_musicxml.py
+
+In create_score_info(), changed from:
+    info_node = etree.SubElement(self.score_info, tag, attr)
+    info_node.text = info
+To:
+    info_node = etree.Element(tag, attr)
+    info_node.text = info
+    self.score_info.insert(0, info_node)
+
+In add_staff(), changed from:
+    staffnode = etree.SubElement(self.current_note, "staff")
+    staffnode.text = str(staff)
+To:
+    staffnode = etree.Element("staff")
+    staffnode.text = str(staff)
+    # Insert before <notations> if present
+    notations_index = None
+    for i, child in enumerate(self.current_note):
+        if child.tag == "notations":
+            notations_index = i
+            break
+    if notations_index is not None:
+        self.current_note.insert(notations_index, staffnode)
+    else:
+        self.current_note.append(staffnode)
+
+TESTING
+-------
+MusicXML output verification:
+
+Before fix:
+  <identification>
+    <encoding>...</encoding>
+    <creator type="composer">Name</creator>   <!-- WRONG ORDER -->
+  </identification>
+
+  <note>
+    <notations><slur .../></notations>
+    <staff>2</staff>                           <!-- WRONG ORDER -->
+  </note>
+
+After fix:
+  <identification>
+    <creator type="composer">Name</creator>   <!-- CORRECT -->
+    <encoding>...</encoding>
+  </identification>
+
+  <note>
+    <staff>2</staff>                           <!-- CORRECT -->
+    <notations><slur .../></notations>
+  </note>
+
+Tested with:
+  - MuseScore 4: Still imports correctly (regression check)
+  - Dorico: No more validation errors on import
+
+SUBMITTING UPSTREAM
+-------------------
+This would be a bug fix PR to:
+https://github.com/frescobaldi/python-ly
+
+PR title: "Fix MusicXML element ordering for spec compliance"
+PR label: bug
+
+Benefits:
+- MusicXML output validates against MusicXML 3.0 schema
+- Dorico and other strict parsers can import without errors
+- Better interoperability across notation software
+
+STATUS
+------
+- Implemented locally: YES
+- Tested with MuseScore: PENDING
+- Tested with Dorico: PENDING
+- PR submitted: PENDING

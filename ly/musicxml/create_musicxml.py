@@ -74,8 +74,9 @@ class CreateMusicXML():
 
     def create_score_info(self, tag, info, attr={}):
         """Create score info."""
-        info_node = etree.SubElement(self.score_info, tag, attr)
+        info_node = etree.Element(tag, attr)
         info_node.text = info
+        self.score_info.insert(0, info_node)
 
     def create_partgroup(self, gr_type, num, name=None, abbr=None, symbol=None):
         """Create a new part group."""
@@ -115,8 +116,6 @@ class CreateMusicXML():
             if midi in midi_program_map:
                 midiprog = etree.SubElement(midiinstr, "midi-program")
                 midiprog.text = str(midi_program_map[midi])
-            midiname = etree.SubElement(midiinstr, "midi-name")
-            midiname.text = midi
         self.current_part = etree.SubElement(self.root, "part", id="P"+strnr)
         self.part_count += 1
         self.bar_nr = 1
@@ -576,8 +575,18 @@ class CreateMusicXML():
         voicenode.text = str(voice)
 
     def add_staff(self, staff):
-        staffnode = etree.SubElement(self.current_note, "staff")
+        staffnode = etree.Element("staff")
         staffnode.text = str(staff)
+        # Insert <staff> before <notations> to comply with MusicXML element order
+        notations_index = None
+        for i, child in enumerate(self.current_note):
+            if child.tag == "notations":
+                notations_index = i
+                break
+        if notations_index is not None:
+            self.current_note.insert(notations_index, staffnode)
+        else:
+            self.current_note.append(staffnode)
 
     def add_staves(self, staves):
         index = get_tag_index(self.bar_attr, "time")

@@ -17,15 +17,16 @@ General MIDI PROGRAM NUMBER.
 Before (what python-ly exported):
     <midi-instrument id="P1-I1">
       <midi-channel>1</midi-channel>
-      <midi-name>violin</midi-name>
     </midi-instrument>
 
 After (what DAWs need):
     <midi-instrument id="P1-I1">
       <midi-channel>1</midi-channel>
       <midi-program>41</midi-program>      <-- ADDED
-      <midi-name>violin</midi-name>
     </midi-instrument>
+
+NOTE: <midi-name> was previously included but has been removed.
+It is not a valid MusicXML 3.0 element and caused import errors in Dorico.
 
 THE SOLUTION
 ------------
