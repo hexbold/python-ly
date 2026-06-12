@@ -71,6 +71,7 @@ lilypond_music_commands = (
     'addInstrumentDefinition',
     'addlyrics',
     'addQuote',
+    'addToTagGroup', # since 2.26
     'after',
     'afterGrace',
     #'afterGraceFraction', # this is a parser variable
@@ -86,10 +87,12 @@ lilypond_music_commands = (
     'ambitusAfter',
     #'AncientRemoveEmptyStaffContext',
     'appendToTag', # since 2.16
+    'appendToTagMarkup', # since 2.26
     'applyContext',
     'applyMusic',
     'applyOutput',
     'appoggiatura',
+    'approximatePitch', # since 2.26
     'arabicStringNumbers', # since 2.20
     'arpeggio',
     'arpeggioArrowDown',
@@ -101,6 +104,8 @@ lilypond_music_commands = (
     'ascendens',
     'assertBeamQuant',
     'assertBeamSlope',
+    'atLeft', # since 2.26
+    'atRight', # since 2.26
     'auctum',
     'aug',
     'augmentum',
@@ -134,6 +139,8 @@ lilypond_music_commands = (
     'bookOutputSuffix',
     'bp', # since 2.24
     'break',
+    'breakAlignInsert', # since 2.26
+    'breakDynamicSpan', # since 2.26
     'breathe',
     'breve',
     'cadenzaOff',
@@ -147,6 +154,7 @@ lilypond_music_commands = (
     'chordRepeats', # since 2.16
     #'chordRootNamer',
     'chords',
+    'chordSlur', # since 2.26
     'clef',
     'cm',
     'codaMark', # since 2.24
@@ -155,6 +163,7 @@ lilypond_music_commands = (
     'compressEmptyMeasures',
     'compressMMRests', # since 2.23
     'context',
+    'contextPropertyCheck', # since 2.26
     'cr',
     'cresc',
     'crescHairpin',
@@ -212,6 +221,7 @@ lilypond_music_commands = (
     'easyHeadsOff',
     'easyHeadsOn',
     'EnableGregorianDivisiones', # 2.24
+    'enablePerStaffTiming', # since 2.26
     'enablePolymeter',
     'endcr',
     'endcresc',
@@ -220,6 +230,7 @@ lilypond_music_commands = (
     'endincipit',
     'endSkipNCs',
     'endSpanners',
+    'englishChords', # since 2.26
     'episemFinis',
     'episemInitium',
     'eventChords', # since 2.23
@@ -239,6 +250,8 @@ lilypond_music_commands = (
     'finger', # since 2.23
     'fingeringOrientations',
     'fixed', # since 2.23
+    'flagStyleDefault', # since 2.26
+    'flagStyleStacked', # since 2.26
     'flexa',
     'footnote', # since 2.23
     'fp',
@@ -250,6 +263,7 @@ lilypond_music_commands = (
     'germanChords',
     'glide', # since 2.24
     'glissando',
+    'glissandoMap', # since 2.20
     'grace',
     'graceSettings',
     'grobdescriptions', # since 2.23
@@ -276,6 +290,7 @@ lilypond_music_commands = (
     'inclinatum',
     'includePageLayoutFile',
     'indent',
+    'initialContextFrom', # since 2.26
     'inStaffSegno', # since 2.23
     'instrumentSwitch',
     'instrumentTransposition',
@@ -327,6 +342,7 @@ lilypond_music_commands = (
     'modalInversion', # since 2.23
     'modalTranspose', # since 2.23
     'mp',
+    'musicLength', # since 2.26
     'musicMap',
     'n', # since 2.22
     'neumeDemoLayout',
@@ -334,6 +350,7 @@ lilypond_music_commands = (
     'newSpacingSection',
     'noBeam',
     'noBreak',
+    'nonArpeggiato', # since 2.26
     'noPageBreak',
     'noPageTurn',
     'normalsize',
@@ -384,6 +401,8 @@ lilypond_music_commands = (
     'pointAndClickOff',
     'pointAndClickOn',
     'pointAndClickTypes',
+    'polymetric', # since 2.26
+    'popContextProperty', # since 2.26
     'pp',
     'ppp',
     'pppp',
@@ -398,7 +417,9 @@ lilypond_music_commands = (
     'propertyTweak', # since 2.23
     'propertyUnset', # since 2.23
     'pt',
+    'pushContextProperty', # since 2.26
     'pushToTag', # since 2.16
+    'pushToTagMarkup', # since 2.26
     'quilisma',
     'quoteDuring',
     'raiseNote', # since 2.23
@@ -408,10 +429,14 @@ lilypond_music_commands = (
     'RemoveEmptyRhythmicStaffContext',
     'RemoveEmptyStaffContext',
     'RemoveEmptyStaves', # since 2.20
+    'removeFromTagGroup', # since 2.26
     'removeWithTag',
     'repeat',
     'repeatTie',
+    'replaceWithTagMarkup', # since 2.26
     'resetRelativeOctave',
+    'resetTagGroup', # since 2.26
+    'resetTagGroups', # since 2.26
     'responsum',
     'rest',
     'retrograde', # since 2.23
@@ -449,6 +474,7 @@ lilypond_music_commands = (
     'skipNCs',
     'skipTypesetting',
     'slashedGrace', # since 2.20
+    'slashSeparator', # since 2.20
     'slurDashed',
     'slurDashPattern',
     'slurDotted',
@@ -474,6 +500,7 @@ lilypond_music_commands = (
     'startGroup',
     'startMeasureCount',
     'startMeasureSpanner',
+    'startOptionalMaterial', # since 2.26
     'startSlashedGraceMusic',
     'startStaff',
     'startTextSpan',
@@ -487,6 +514,7 @@ lilypond_music_commands = (
     'stopGroup',
     'stopMeasureCount',
     'stopMeasureSpanner',
+    'stopOptionalMaterial', # since 2.26
     'stopSlashedGraceMusic',
     'stopStaff',
     'stopStaffHighlight',
@@ -497,12 +525,14 @@ lilypond_music_commands = (
     'strokeFingerOrientations',
     'stropha',
     'styledNoteHeads', # since 2.23
+    'submeasureBarsOn', # since 2.26
     'sustainOff',
     'sustainOn',
     'tabChordRepeats',
     'tabChordRepetition',
     'tabFullNotation',
     'tag',
+    'tagGroupRef', # since 2.26
     'teeny',
     'tempo',
     'tempoWholesPerMinute',
@@ -523,10 +553,12 @@ lilypond_music_commands = (
     'tieSolid',
     'tieUp',
     'time',
+    'timeAbbrev', # since 2.26
     'times',
     'timing',
     'tiny',
     'tocItem', # since ?
+    'tocItemWithDotsMarkup', # since 2.14
     'transpose',
     'transposedCueDuring',
     'transposition',
@@ -558,11 +590,13 @@ lilypond_music_commands = (
     'voiceTwoStyle',
     'void', # since 2.23
     'volta', # since 2.24
+    'vowelTransition', # since 2.26
     'vshape', # since 2.23
     'walkerHeads',
     'walkerHeadsMinor',
     'whiteTriangleMarkup',
     'withMusicProperty',
+    'withRelativeDir', # since 2.26
     'xNote',
     'xNotesOff',
     'xNotesOn',
@@ -581,6 +615,7 @@ articulations = (
 
 
 ornaments = (
+    'bachschleifer', # since 2.26
     'downmordent',
     'downprall',
     'haydnturn', # since 2.22
@@ -615,15 +650,24 @@ instrument_scripts = (
     'downbow',
     'flageolet',
     'halfopen',
+    'heel', # since 2.26
+    'heelcircle', # since 2.26
     'lheel',
+    'lheeltoe', # since 2.26
     'ltoe',
+    'ltoeheel', # since 2.26
     'open',
     'rheel',
+    'rheeltoe', # since 2.26
     'rtoe',
+    'rtoeheel', # since 2.26
     'snappizzicato',
     'stopped',
     'thumb',
+    'toe', # since 2.26
     'upbow',
+    'varheel', # since 2.26
+    'vartoe', # since 2.26
 )
 
 
@@ -679,7 +723,10 @@ markupcommands_nargs = (
 ),
 # one argument
 (
+    'abs-hspace', # since 2.26
+    'abs-vspace', # since 2.26
     'accidental',
+    'annotate-moving', # since 2.26
     'backslashed-digit',
     'bold',
     'box',
@@ -735,6 +782,7 @@ markupcommands_nargs = (
     'normal-size-sub',
     'normal-size-super',
     'normal-text',
+    'normal-weight', # since 2.26
     'number',
     'oval', # since 2.18
     'overlay', # since 2.20
@@ -752,6 +800,7 @@ markupcommands_nargs = (
     'sans',
     'score',
     'score-lines',
+    'serif', # since 2.26
     'simple',
     'slashed-digit',
     'small',
@@ -798,6 +847,7 @@ markupcommands_nargs = (
     'hcenter-in',
     'if',
     'lower',
+    'keep-with-tag', # since 2.26
     'magnify',
     'note',
     'on-the-fly',
@@ -807,6 +857,7 @@ markupcommands_nargs = (
     'pad-x',
     'page-link',
     'path',     # added in LP 2.13.31
+    'qr-code', # since 2.26
     'raise',
     'replace',
     'rest-by-number',
@@ -827,6 +878,7 @@ markupcommands_nargs = (
 ),
 # three arguments
 (
+    'append-to-tag', # since 2.26
     'arrow-head',
     'beam',
     'draw-circle',
@@ -834,9 +886,11 @@ markupcommands_nargs = (
     'epsfile',
     'filled-box',
     'general-align',
+    'image', # since 2.26
     'note-by-number',
     'pad-to-box',
     'page-ref',
+    'push-to-tag', # since 2.26
     'with-dimension',
     'with-dimension-from',
     'with-dimensions',
