@@ -103,7 +103,12 @@ class IterateXmlObjs():
             self.musxml.create_part(part.name, part.abbr, part.midi)
             for bar in part.barlist[:-1]:
                 self.iterate_bar(bar)
-            if len(last_bar_objs) > 1 or last_bar_objs[0].has_attr():
+            # A leftover trailing bar may hold SEVERAL empty BarAttrs (one per
+            # merged << \\ >> voice snippet), not just one — skip it whenever it
+            # carries no music and no attributes, or the part gets a phantom
+            # final measure that strict importers (MuseScore) reject.
+            if not all(isinstance(o, BarAttr) and not o.has_attr()
+                       for o in last_bar_objs):
                 self.iterate_bar(last_bar)
         else:
             print("Warning: empty part:", part.name)
