@@ -39,6 +39,10 @@ def test_tuplet():
 def test_bar_duration_grace_tuplet():
     compare_output('bar_duration_grace_tuplet')
 
+
+def test_accidental_display():
+    compare_output('accidental_display')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

@@ -149,13 +149,16 @@ class CreateMusicXML():
         if dot:
             for i in range(dot):
                 self.add_dot()
-        if alter or acc_token:
-            if acc_token == '!': # cautionary
-                self.add_accidental(alter, caut=True)
-            elif acc_token == '?': # parentheses
-                self.add_accidental(alter, parenth=True)
-            else:
-                self.add_accidental(alter)
+        # FIX: emit <accidental> only for explicit LilyPond accidentals
+        # (! forced, ? cautionary). <accidental> is a DISPLAY element; the
+        # sounding pitch is fully described by <alter>, and notation software
+        # derives printed accidentals from <alter> + key signature. Emitting
+        # it unconditionally forced a redundant printed accidental on every
+        # altered note (e.g. flats on all diatonic b/es/as in Es-Dur).
+        if acc_token == '!': # forced/reminder accidental
+            self.add_accidental(alter, caut=True)
+        elif acc_token == '?': # cautionary, in parentheses
+            self.add_accidental(alter, parenth=True)
         if stem_dir:
             self.set_stem_dir(stem_dir)
 
