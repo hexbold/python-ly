@@ -55,6 +55,10 @@ def test_tempo_before_music():
 def test_staffgroup_nested():
     compare_output('staffgroup_nested')
 
+
+def test_final_barline():
+    compare_output('final_barline')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

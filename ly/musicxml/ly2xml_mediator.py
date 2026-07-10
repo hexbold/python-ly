@@ -339,10 +339,39 @@ class Mediator():
         self.bar.add(obj)
 
     def create_barline(self, bl):
+        """Create a \\bar barline in the bar it belongs to.
+
+        A full bar closes eagerly, so when "\\bar" arrives the current bar
+        is usually already a fresh EMPTY one. Putting the barline there
+        (as this method used to) had two consequences: a "\\bar" at the
+        very end of the piece produced a phantom empty final measure —
+        which strict importers (MuseScore 4) reject outright — and the
+        barline element itself rendered in the wrong measure. Attach the
+        barline to the last bar that holds content instead; only if no
+        such bar exists (barline before any music) a new bar is used.
+        """
         barline = xml_objs.BarAttr()
         barline.set_barline(bl)
-        self.bar.add(barline)
-        self.new_bar()
+
+        def is_empty(bar):
+            return all(isinstance(o, xml_objs.BarAttr) and not o.has_attr()
+                       for o in bar.obj_list)
+
+        target = self.bar
+        if target is None or is_empty(target):
+            for bar in reversed(self.insert_into.barlist):
+                if not is_empty(bar):
+                    target = bar
+                    break
+        if target is None:
+            self.new_bar()
+            target = self.bar
+        target.add(barline)
+        if target is self.bar:
+            # mid-bar barline: close the bar; the next music opens a new
+            # one lazily (add_to_bar), so no empty leftover is created
+            self.bar.list_full = True
+            self.bar = None
 
     def new_repeat(self, rep):
         barline = xml_objs.BarAttr()
