@@ -414,7 +414,10 @@ class Reader(object):
         """Read an assignment from the variable name. May return None."""
         item = self.factory(Assignment, t)
         for t in skip(self.source):
-            if isinstance(t, (lilypond.Variable, lilypond.UserVariable, lilypond.DotPath)):
+            # DecimalValue covers numeric path segments of dotted assignments
+            # (LilyPond 2.20+), e.g. the 1 in ``vc.1 = { ... }``
+            if isinstance(t, (lilypond.Variable, lilypond.UserVariable, lilypond.DotPath,
+                              lilypond.DecimalValue)):
                 item.append(self.factory(PathItem, t))
             elif isinstance(t, lilypond.EqualSign):
                 item.tokens = (t,)

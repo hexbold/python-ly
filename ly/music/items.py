@@ -1062,8 +1062,17 @@ class MarkupWord(Item):
 class Assignment(Item):
     """A variable = value construct."""
     def name(self):
-        """The variable name."""
-        return self.token
+        """The variable name.
+
+        For dotted assignments (``vc.1 = ...``) the direct PathItem
+        children are included, so the full name ``vc.1`` is returned and a
+        dotted UserCommand reference ``\\vc.1`` (whose name() is the token
+        without the backslash) finds this assignment. Only DIRECT children
+        count — PathItems nested inside the assigned value (e.g. an
+        \\override path in the music) must not leak into the name.
+        """
+        return self.token + ''.join(
+            p.token for p in self if isinstance(p, PathItem))
     
     def value(self):
         """The assigned value."""

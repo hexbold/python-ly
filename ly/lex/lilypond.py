@@ -55,8 +55,21 @@ class Identifier(_token.Token):
 
 
 class IdentifierRef(_token.Token):
-    r"""A reference to an identifier, e.g. ``\some-variable``."""
-    rx = r"\\" + re_identifier + re_identifier_end
+    r"""A reference to an identifier, e.g. ``\some-variable`` or ``\vc.1``.
+
+    Also matches dotted references to variables assigned with the
+    LilyPond 2.20+ dotted-path syntax (``vc.1 = { ... }`` referenced as
+    ``\vc.1``); path segments may be names or unsigned integers.
+
+    NOTE: the dotted extension must live HERE, on the rx shared by
+    Keyword, Command and UserCommand — the lexer groups token classes by
+    identical rx string and picks the class via test_match(), with the
+    last class of the group as fallback. Overriding rx in a subclass
+    would pull that class out of the group and break the dispatch. The
+    added groups are non-capturing so match.lastindex still points at
+    the group of the alternation.
+    """
+    rx = r"\\" + re_identifier + r"(?:\.(?:" + re_identifier + r"|\d+))*" + re_identifier_end
 
 
 class Variable(Identifier):
