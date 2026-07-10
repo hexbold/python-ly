@@ -422,13 +422,18 @@ class Mediator():
     def set_relative(self, note):
         self.prev_pitch = note.pitch
 
-    def increase_bar_dura(self, duration):
-        self.bar_dura += duration[0] * duration[1]
+    def increase_bar_dura(self, duration, tupl_factor=1):
+        # FIX: tupl_factor = product of active tuplet fractions (actual/normal).
+        # ly.music durations do NOT include tuplet scaling, so divide here,
+        # otherwise tuplet bars overflow and their last note(s) get pushed
+        # across the barline.
+        self.bar_dura += duration[0] * duration[1] / tupl_factor
         if self.bar_dura >= self.current_time:
             self.bar_dura = 0
             self.new_bar()
 
-    def new_note(self, note, rel=False, is_unpitched=False):
+    def new_note(self, note, rel=False, is_unpitched=False, is_grace=False,
+                 tupl_factor=1):
         self.current_is_rest = False
         self.clear_chord()
         if is_unpitched:
@@ -442,9 +447,11 @@ class Mediator():
             self.current_note.set_stem_direction(self.stem_dir)
         self.do_action_onnext(self.current_note)
         self.action_onnext = []
-        self.increase_bar_dura(note.duration)
+        if not is_grace:  # FIX: grace notes occupy no real time in the bar
+            self.increase_bar_dura(note.duration, tupl_factor)
 
-    def new_iso_dura(self, note, rel=False, is_unpitched=False):
+    def new_iso_dura(self, note, rel=False, is_unpitched=False, is_grace=False,
+                     tupl_factor=1):
         """
         Isolated durations in music sequences.
 
@@ -455,11 +462,11 @@ class Mediator():
 
         """
         if self.current_chord:
-            self.copy_prev_chord(note.duration)
+            self.copy_prev_chord(note.duration, is_grace, tupl_factor)
         else:
             if not is_unpitched:
                 note.pitch = self.current_lynote.pitch
-            self.new_note(note, rel, is_unpitched)
+            self.new_note(note, rel, is_unpitched, is_grace, tupl_factor)
 
     def create_unpitched(self, unpitched):
         """Create a xml_objs.Unpitched from ly.music.items.Unpitched."""
@@ -553,21 +560,24 @@ class Mediator():
             for c in self.current_chord:
                 c.set_durtype(durval2type(self.dur_token))
 
-    def new_chord(self, note, duration=None, rel=False, chord_base=True):
+    def new_chord(self, note, duration=None, rel=False, chord_base=True,
+                  is_grace=False, tupl_factor=1):
         if chord_base:
-            self.new_chordbase(note, duration, rel)
+            self.new_chordbase(note, duration, rel, is_grace, tupl_factor)
             self.current_chord.append(self.current_note)
         else:
             self.current_chord.append(self.new_chordnote(note, rel))
         self.do_action_onnext(self.current_chord[-1])
 
-    def new_chordbase(self, note, duration, rel=False):
+    def new_chordbase(self, note, duration, rel=False, is_grace=False,
+                      tupl_factor=1):
         self.current_note = self.create_barnote_from_note(note)
         self.current_note.set_duration(duration)
         self.current_lynote = note
         self.check_current_note(rel)
         self._chord_bar = self.bar  # Save bar ref before increase_bar_dura() may trigger new_bar()
-        self.increase_bar_dura(duration)  # FIX: count chord duration for bar boundaries
+        if not is_grace:  # FIX: grace chords occupy no real time in the bar
+            self.increase_bar_dura(duration, tupl_factor)  # FIX: count chord duration for bar boundaries
 
     def new_chordnote(self, note, rel):
         chord_note = self.create_barnote_from_note(note)
@@ -589,7 +599,7 @@ class Mediator():
         self._chord_bar.add(chord_note)  # Use saved bar ref (not self.bar which may have advanced)
         return chord_note
 
-    def copy_prev_chord(self, duration):
+    def copy_prev_chord(self, duration, is_grace=False, tupl_factor=1):
         if self.current_chord:
             prev_chord = self.current_chord
             self.clear_chord()
@@ -606,7 +616,8 @@ class Mediator():
                 cn.set_tie('stop')
             self.bar.add(cn)
         self.tied = False
-        self.increase_bar_dura(duration)  # FIX: count repeated chord duration for bar boundaries
+        if not is_grace:  # FIX: grace chords occupy no real time in the bar
+            self.increase_bar_dura(duration, tupl_factor)  # FIX: count repeated chord duration for bar boundaries
 
     def clear_chord(self):
         self.q_chord = self.current_chord
@@ -617,7 +628,7 @@ class Mediator():
         """Actions when chord is parsed."""
         self.action_onnext = []
 
-    def new_rest(self, rest):
+    def new_rest(self, rest, tupl_factor=1):
         self.current_is_rest = True
         self.clear_chord()
         rtype = rest.token
@@ -631,7 +642,7 @@ class Mediator():
         elif rtype == 's' or rtype == '\\skip':
             self.current_note = xml_objs.BarRest(dur, self.voice, skip=True)
         self.check_current_note(rest=True)
-        self.increase_bar_dura(dur)
+        self.increase_bar_dura(dur, tupl_factor)
 
     def note2rest(self):
         """Note used as rest position transformed to rest."""

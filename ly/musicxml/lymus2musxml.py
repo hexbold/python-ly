@@ -29,6 +29,8 @@ is captured.
 from __future__ import unicode_literals
 from __future__ import print_function
 
+from fractions import Fraction
+
 import ly.document
 import ly.music
 
@@ -276,11 +278,13 @@ class ParseSource():
         #print(note.token)
         if note.length():
             if self.relative and not self.rel_pitch_isset:
-                self.mediator.new_note(note, False)
+                self.mediator.new_note(note, False, is_grace=self.grace_seq,
+                                       tupl_factor=self.tuplet_factor())
                 self.mediator.set_relative(note)
                 self.rel_pitch_isset = True
             else:
-                self.mediator.new_note(note, self.relative)
+                self.mediator.new_note(note, self.relative, is_grace=self.grace_seq,
+                                       tupl_factor=self.tuplet_factor())
             self.check_note(note)
         else:
             if isinstance(note.parent(), ly.music.items.Relative):
@@ -290,7 +294,9 @@ class ParseSource():
                 if self.mediator.current_chord:
                     self.mediator.new_chord(note, chord_base=False)
                 else:
-                    self.mediator.new_chord(note, note.parent().duration, self.relative)
+                    self.mediator.new_chord(note, note.parent().duration, self.relative,
+                                            is_grace=self.grace_seq,
+                                            tupl_factor=self.tuplet_factor())
                     self.check_tuplet()
                 # chord as grace note
                 if self.grace_seq:
@@ -300,15 +306,21 @@ class ParseSource():
         """A note without pitch, just a standalone duration."""
         if unpitched.length():
             if self.alt_mode == 'drum':
-                self.mediator.new_iso_dura(unpitched, self.relative, True)
+                self.mediator.new_iso_dura(unpitched, self.relative, True,
+                                           is_grace=self.grace_seq,
+                                           tupl_factor=self.tuplet_factor())
             else:
-                self.mediator.new_iso_dura(unpitched, self.relative)
+                self.mediator.new_iso_dura(unpitched, self.relative,
+                                           is_grace=self.grace_seq,
+                                           tupl_factor=self.tuplet_factor())
             self.check_note(unpitched)
 
     def DrumNote(self, drumnote):
         """A note in DrumMode."""
         if drumnote.length():
-            self.mediator.new_note(drumnote, is_unpitched=True)
+            self.mediator.new_note(drumnote, is_unpitched=True,
+                                   is_grace=self.grace_seq,
+                                   tupl_factor=self.tuplet_factor())
             self.check_note(drumnote)
 
     def check_note(self, note):
@@ -333,6 +345,19 @@ class ParseSource():
                                                 td['nr'])
                 td['ttype'] = ""
             self.mediator.check_divs()
+
+    def tuplet_factor(self):
+        """Product of the active tuplet fractions (actual/normal).
+
+        Durations reported by ly.music do NOT include \\tuplet scaling.
+        The mediator's bar-length bookkeeping must divide by this factor,
+        otherwise bars containing tuplets overflow and drop notes (FIX;
+        see tests/test-musicxml-tuplet-markup.ly).
+        """
+        f = Fraction(1)
+        for td in self.tuplet:
+            f *= Fraction(td['fraction'][0], td['fraction'][1])
+        return f
 
     def Duration(self, duration):
         """A written duration"""
@@ -368,14 +393,14 @@ class ParseSource():
         r""" rest, r or R. Note: NOT by command, i.e. \rest """
         if rest.token == 'R':
             self.scale = 'R'
-        self.mediator.new_rest(rest)
+        self.mediator.new_rest(rest, tupl_factor=self.tuplet_factor())
 
     def Skip(self, skip):
         r""" invisible rest/spacer rest (s or command \skip)"""
         if 'lyrics' in self.sims_and_seqs:
             self.mediator.new_lyrics_item(skip.token)
         else:
-            self.mediator.new_rest(skip)
+            self.mediator.new_rest(skip, tupl_factor=self.tuplet_factor())
 
     def Scaler(self, scaler):
         r"""
