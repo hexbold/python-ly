@@ -189,11 +189,33 @@ class ParseSource():
         else:
             self.mediator.new_header_assignment(a.name(), val)
 
+    def sim_is_container(self, musicList):
+        """True if a ``<< >>`` directly holds staff/group/piano contexts.
+
+        Such a simultaneous list is score STRUCTURE (a container of parts),
+        not simultaneous music, and must not get a music section of its
+        own: each contained staff ends with check_part(), which already
+        consumes a section whenever more than one is open, so a section
+        created for a structural << >> underflows the section stack — a
+        score with two StaffGroup << >> blocks crashed in check_simultan
+        (sections.pop from an empty list). The same predicate is used for
+        the End event (which carries the same node), so open and close
+        stay paired by construction.
+        """
+        for n in musicList:
+            if isinstance(n, ly.music.items.Context) and n.context() in (
+                    part_contexts + group_contexts):
+                return True
+        return False
+
     def MusicList(self, musicList):
         if musicList.token == '<<':
             if self.look_ahead(musicList, ly.music.items.VoiceSeparator):
                 self.mediator.new_snippet('sim-snip')
                 self.voice_sep = True
+            elif self.sim_is_container(musicList):
+                # container of staves/groups: no music section of its own
+                pass
             else:
                 self.mediator.new_section('simultan')
                 self.sims_and_seqs.append('sim')
@@ -678,6 +700,9 @@ class ParseSource():
                 self.mediator.check_voices_by_nr()
                 self.mediator.revert_voicenr()
                 self.voice_sep = False
+            elif self.sim_is_container(end.node):
+                # structural << >>: no section was opened, nothing to close
+                pass
             elif not self.piano_staff:
                 self.mediator.check_simultan()
                 if self.sims_and_seqs:

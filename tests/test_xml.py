@@ -51,6 +51,10 @@ def test_variable_dotted():
 def test_tempo_before_music():
     compare_output('tempo_before_music')
 
+
+def test_staffgroup_nested():
+    compare_output('staffgroup_nested')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 
