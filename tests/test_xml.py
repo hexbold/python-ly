@@ -47,6 +47,10 @@ def test_accidental_display():
 def test_variable_dotted():
     compare_output('variable_dotted')
 
+
+def test_tempo_before_music():
+    compare_output('tempo_before_music')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

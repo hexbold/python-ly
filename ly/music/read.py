@@ -703,10 +703,22 @@ class Reader(object):
                     item.tokens = (t,)
                     equal_sign_seen = True
                     t = None
+                elif not isinstance(t, (lex.Space, lex.Comment)):
+                    # foreign token before any equal sign (text-only tempo
+                    # like \tempo "Andante"): the tempo expression is over
+                    break
             elif isinstance(t, (lilypond.IntegerValue, lilypond.SchemeStart)):
                 item.append(self.read_item(t))
             elif t == "-":
                 item.tokens += (t,)
+            elif not isinstance(t, (lex.Space, lex.Comment)):
+                # the token no longer belongs to the \tempo expression: stop.
+                # Without this the loop silently consumed whatever music
+                # follows the tempo — a chord or a variable reference after
+                # "\tempo 4 = 72" re-enters deeper lexer states, so the
+                # token source kept yielding and the loop discarded the
+                # tokens (dropped chords, corrupted measures).
+                break
         ## if the last token does not belong to the \\tempo expression anymore,
         ## push it back
         if t and not isinstance(t, (lex.Space, lex.Comment)):
