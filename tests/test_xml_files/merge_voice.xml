@@ -6,7 +6,7 @@
   <identification>
     <encoding>
       <software>python-ly 0.9.10</software>
-      <encoding-date>2026-07-10</encoding-date>
+      <encoding-date>2026-07-11</encoding-date>
     </encoding>
   </identification>
   <part-list>
@@ -141,9 +141,6 @@
         <voice>1</voice>
         <type>quarter</type>
       </note>
-      <backup>
-        <duration>4</duration>
-      </backup>
       <backup>
         <duration>4</duration>
       </backup>

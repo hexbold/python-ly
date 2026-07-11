@@ -59,6 +59,10 @@ def test_staffgroup_nested():
 def test_final_barline():
     compare_output('final_barline')
 
+
+def test_pianostaff_voices():
+    compare_output('pianostaff_voices')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

@@ -493,7 +493,17 @@ class Bar():
         return False
 
     def create_backup(self):
-        """ Calculate and create backup object."""
+        """ Calculate and create backup object.
+
+        The backup must rewind to the START of the measure, and after a
+        BarBackup the position IS the start of the measure — so sum the
+        durations written since the LAST backup (the voice just added).
+        Stopping at the first backup instead (as this method used to)
+        returns the length of whatever precedes it, which is 0 when a
+        merged bar starts with only attributes — e.g. a staff bar holding
+        just clef/time that voices are merged into. add_backup() silently
+        drops a 0 duration, so the voices then played sequentially.
+        """
         b = 0
         s = 1
         for obj in self.obj_list:
@@ -502,7 +512,8 @@ class Bar():
                     b += obj.duration[0]
                     s *= obj.duration[1]
             elif isinstance(obj, BarBackup):
-                break
+                b = 0
+                s = 1
         self.add(BarBackup((b, s)))
 
     def is_skip(self, obj_list=None):
@@ -510,6 +521,16 @@ class Bar():
         if not obj_list:
             obj_list = self.obj_list
         for obj in obj_list:
+            if isinstance(obj, BarBackup):
+                # inject_voice only writes a backup before non-skip
+                # material, so a bar containing one cannot be skip-only.
+                # BarBackup also has no has_attr(), so it must be handled
+                # before the attribute check below. This is reached when an
+                # already merged multi-voice bar is merged again — e.g. a
+                # PianoStaff whose staves each hold explicit \new Voice
+                # contexts: the voices merge per staff first, then End of
+                # the PianoStaff merges the two staves into one part.
+                return False
             if obj.has_attr():
                 return False
             if isinstance(obj, BarNote):
