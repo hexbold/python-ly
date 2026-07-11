@@ -319,8 +319,25 @@ class Mediator():
         if self.sections:
             return self.sections[0].barlist
 
-    def set_pickup(self):
-        self.bar_is_pickup = True
+    def set_pickup(self, length=None):
+        r"""A \partial upbeat of the given length (a Fraction) starts here.
+
+        Two things must happen. (1) The pickup measure gets marked: when
+        \partial follows \time or \clef the current bar ALREADY exists
+        (those create it for their attributes), so mark it directly —
+        the bar_is_pickup flag would only reach the NEXT bar. (2) Bars
+        close purely by duration sum (increase_bar_dura), so an
+        untreated pickup bar swallows notes of the following measure
+        until a full bar is reached, shifting EVERY later barline.
+        Pre-filling bar_dura with the missing part of the measure makes
+        the pickup bar close after exactly `length` of music.
+        """
+        if self.bar is not None and not self.bar.has_music():
+            self.bar.pickup = True
+        else:
+            self.bar_is_pickup = True
+        if length:
+            self.bar_dura = self.current_time - length
 
     def new_bar(self, fill_prev=True):
         if self.bar and fill_prev:

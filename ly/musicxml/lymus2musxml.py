@@ -293,6 +293,13 @@ class ParseSource():
         self.relative = True
 
     def Partial(self, partial):
+        r"""A \partial command."""
+        # The item already knows its length (dots and scaling included);
+        # hand it to the mediator NOW so the pickup bar can close after
+        # exactly that much music. The duration token of \partial itself
+        # still arrives as a Duration event — self.pickup makes the
+        # Duration handler swallow it so it is not taken as a note length.
+        self.mediator.set_pickup(partial.partial_length())
         self.pickup = True
 
     def Note(self, note):
@@ -393,7 +400,7 @@ class ParseSource():
             self.mediator.set_tuplspan_dur(duration.token, duration.tokens)
             self.tupl_span = False
         elif self.pickup:
-            self.mediator.set_pickup()
+            # the duration of \partial itself — already handled in Partial()
             self.pickup = False
         else:
             self.mediator.new_duration_token(duration.token, duration.tokens)

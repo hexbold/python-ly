@@ -74,9 +74,12 @@ def test_mark():
     compare_output('mark')
 
 
-@pytest.mark.xfail
 def test_partial():
     compare_output('partial')
+
+
+def test_partial_time():
+    compare_output('partial_time')
 
 
 def test_full_bar():
