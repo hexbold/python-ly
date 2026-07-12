@@ -277,6 +277,33 @@ class Mediator():
         else:
             print("Warning can't merge in lyrics!", voice_section)
 
+    def merge_dangling_attr_bar(self, section):
+        r"""Merge a music-less bar the part is left holding into `section`'s first bar.
+
+        Attributes written in a staff block BEFORE its voice — e.g.
+        ``\new Staff { \tempo 4 = 72 \new Voice = "mel" \melody }`` — are parsed
+        while ``insert_into`` is still the part itself (the voice's section does
+        not exist yet), so they open a bar directly in the part's barlist.
+        Extending the part with the voice's bars then left that attribute-only
+        bar standing as a phantom EMPTY first measure: the voice sounded one
+        measure late against every other part, and the global merge padded the
+        other parts with an empty final measure. Fold such a dangling bar's
+        attributes into the first real measure instead (never overriding the
+        voice's own attributes)."""
+        if not (self.part and self.part.barlist and section.barlist):
+            return
+        last = self.part.barlist[-1]
+        if last.has_music() or not all(
+                isinstance(o, xml_objs.BarAttr) for o in last.obj_list):
+            return
+        first = section.barlist[0]
+        for obj in last.obj_list:
+            if first.obj_list and isinstance(first.obj_list[0], xml_objs.BarAttr):
+                first.obj_list[0].merge_attr(obj)
+            else:
+                first.obj_list.insert(0, obj)
+        self.part.barlist.pop()
+
     def check_part(self):
         """Adds the latest active section to the part."""
         if len(self.sections)>1:
@@ -285,6 +312,7 @@ class Mediator():
             if self.sections[-1].glob:
                 self.part.merge_voice(self.sections[-1])
             else:
+                self.merge_dangling_attr_bar(self.sections[-1])
                 self.part.barlist.extend(self.sections[-1].barlist)
                 self.sections.pop()
         if self.part and self.part.to_part:

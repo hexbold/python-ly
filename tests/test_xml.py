@@ -111,6 +111,14 @@ def test_chord_duration():
     compare_output('chord_duration')
 
 
+def test_staff_attr_before_voice():
+    # Attributes written in a staff block BEFORE its \new Voice (e.g.
+    # \new Staff { \tempo 4 = 72 \new Voice = "mel" \melody }) must fold into
+    # the first measure — they used to become a phantom empty first measure,
+    # shifting the voice one measure against every other part.
+    compare_output('staff_attr_before_voice')
+
+
 def ly_to_xml(filename):
     """Read Lilypond file and return XML string."""
     writer = ly.musicxml.writer()
