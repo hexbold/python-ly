@@ -600,6 +600,9 @@ class ParseSource():
         prev = self.get_previous_node(string)
         if prev and prev.token == '\\bar':
             self.mediator.create_barline(string.value())
+        elif isinstance(string.parent(), ly.music.items.Postfix):
+            # note-attached text, e.g. c4^"pizz." or c4_"dolce"
+            self.mediator.new_note_word(string.value())
 
     def LyricsTo(self, lyrics_to):
         r"""A \lyricsto expression. """

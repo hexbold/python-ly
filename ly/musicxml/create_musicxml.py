@@ -653,7 +653,7 @@ class CreateMusicXML():
             self.add_direction()
         dirtypenode = etree.SubElement(self.direction, "direction-type")
         wordsnode = etree.SubElement(dirtypenode, "words")
-        wordsnode.text = words
+        wordsnode.text = words.rstrip()
 
     def add_mark(self, mark):
         """Add rehearsal mark in direction"""

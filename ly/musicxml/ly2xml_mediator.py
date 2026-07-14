@@ -473,6 +473,15 @@ class Mediator():
             new_bar_attr.set_word(word)
             self.add_to_bar(new_bar_attr)
 
+    def new_note_word(self, word):
+        # a note-attached text gets its own direction at the note's position,
+        # not merged into the bar's attributes like joined markup words
+        if self.bar is None:
+            self.new_bar()
+        new_bar_attr = xml_objs.BarAttr()
+        new_bar_attr.set_word(word)
+        self.add_to_bar(new_bar_attr)
+
     def new_time(self, num, den, numeric=False):
         self.current_time = Fraction(num, den.denominator)
         if self.bar is None:
