@@ -114,6 +114,10 @@ def test_full_bar():
     compare_output('full_bar_rest')
 
 
+def test_multibar_rest():
+    compare_output('multibar_rest')
+
+
 def test_stem_direction():
     compare_output('stem')
 

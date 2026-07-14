@@ -651,7 +651,7 @@ class Mediator():
     def check_duration(self, rest):
         """Check the duration for the current note."""
         dots, rs = self.duration_from_tokens(self.dur_tokens)
-        if rest and rs: # special case of multibar rest
+        if rest and rs: # special case of multibar rest R1*N
             if not self.current_note.show_type or self.current_note.skip:
                 bs = self.current_note.duration
                 if rs == bs[1]:
@@ -774,16 +774,19 @@ class Mediator():
         self.bar.add(new_bar_attr)
 
     def scale_rest(self, bs):
-        """ create multiple whole bar rests """
+        """ R1*N: the first measure's rest is already placed; fill the
+        remaining N-1 measures with full-measure rests. The current bar is
+        the empty one after the first rest, so add to it and advance, rather
+        than opening a new bar first (which used to leave that measure empty)."""
         dur = self.current_note.duration
         voc = self.current_note.voice
         st = self.current_note.show_type
         sk = self.current_note.skip
         multp = int(bs[1] * (bs[0]/self.current_time))
         for i in range(1, int(multp)):
-            self.new_bar()
             rest_copy = xml_objs.BarRest(dur, voice=voc, show_type=st, skip=sk)
             self.add_to_bar(rest_copy)
+            self.increase_bar_dura(dur)
 
     def change_to_tuplet(self, tfraction, ttype, nr, length=None):
         """Change the current note into a tuplet note."""
