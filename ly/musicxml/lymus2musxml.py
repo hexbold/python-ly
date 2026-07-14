@@ -74,6 +74,9 @@ class ParseSource():
         self.scale = ''
         self.grace_seq = False
         self.grace_slash = 0
+        self.alt_active = False
+        self.alt_index = 0
+        self.alt_total = 0
         self.trem_rep = 0
         self.piano_staff = 0
         self.numericTime = False
@@ -222,6 +225,11 @@ class ParseSource():
                 self.sims_and_seqs.append('sim')
         elif musicList.token == '{':
             self.sims_and_seqs.append('seq')
+            if (self.alt_active
+                    and isinstance(musicList.parent(), ly.music.items.MusicList)
+                    and isinstance(musicList.parent().parent(), ly.music.items.Alternative)):
+                self.alt_index += 1
+                self.mediator.new_ending(self.alt_index, 'start')
 
     def Chord(self, chord):
         self.mediator.clear_chord()
@@ -507,6 +515,16 @@ class ParseSource():
         elif repeat.specifier() == 'tremolo':
             self.trem_rep = repeat.repeat_count()
 
+    def Alternative(self, alternative):
+        r"""\alternative { {..} {..} } after a \repeat volta: the endings become volta brackets."""
+        self.alt_active = True
+        self.alt_index = 0
+        self.alt_total = 0
+        for outer in alternative:
+            if isinstance(outer, ly.music.items.MusicList):
+                self.alt_total = sum(1 for c in outer
+                                     if isinstance(c, ly.music.items.MusicList))
+
     def Tremolo(self, tremolo):
         """A tremolo item ":"."""
         if self.look_ahead(tremolo, ly.music.items.Duration):
@@ -687,7 +705,9 @@ class ParseSource():
             self.grace_slash = 0
         elif end.node.token == '\\repeat':
             if end.node.specifier() == 'volta':
-                self.mediator.new_repeat('backward')
+                if not self.alt_active:
+                    self.mediator.new_repeat('backward')
+                self.alt_active = False
             elif end.node.specifier() == 'tremolo':
                 if self.look_ahead(end.node, ly.music.items.MusicList):
                     self.mediator.set_tremolo(trem_type="stop")
@@ -724,6 +744,14 @@ class ParseSource():
                 if self.sims_and_seqs:
                     self.sims_and_seqs.pop()
         elif end.node.token == '{':
+            if (self.alt_active
+                    and isinstance(end.node.parent(), ly.music.items.MusicList)
+                    and isinstance(end.node.parent().parent(), ly.music.items.Alternative)):
+                if self.alt_index < self.alt_total:
+                    repeat = 'backward' if self.alt_index == 1 else None
+                    self.mediator.new_ending(self.alt_index, 'stop', repeat)
+                else:
+                    self.mediator.new_ending(self.alt_index, 'discontinue')
             if self.sims_and_seqs:
                 self.sims_and_seqs.pop()
         elif end.node.token == '<': #chord

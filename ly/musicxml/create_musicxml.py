@@ -576,6 +576,14 @@ class CreateMusicXML():
         if repeat:
             repeatnode = etree.SubElement(barnode, "repeat", direction=repeat)
 
+    def add_ending(self, num, endtype, repeat=None):
+        # a volta bracket: type start is a left barline, stop/discontinue a right one
+        location = "left" if endtype == "start" else "right"
+        barnode = etree.SubElement(self.current_bar, "barline", location=location)
+        etree.SubElement(barnode, "ending", number=str(num), type=endtype)
+        if repeat:
+            etree.SubElement(barnode, "repeat", direction=repeat)
+
     def add_backup(self, duration):
         if duration <= 0:
             return

@@ -87,6 +87,10 @@ def test_grace_slash():
 def test_text_script():
     compare_output('text_script')
 
+
+def test_volta_alternative():
+    compare_output('volta_alternative')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

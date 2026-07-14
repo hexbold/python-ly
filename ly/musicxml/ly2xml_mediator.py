@@ -426,6 +426,29 @@ class Mediator():
             self.new_bar()
         self.bar.add(barline)
 
+    def new_ending(self, num, endtype, repeat=None):
+        # a volta bracket: start is a left barline opening the ending's bar,
+        # stop/discontinue a right barline closing it
+        barattr = xml_objs.BarAttr()
+        barattr.set_ending(num, endtype, repeat)
+        if endtype == 'start':
+            if self.bar is None or self.bar.has_music():
+                self.new_bar()
+            self.bar.add(barattr)
+        else:
+            # the ending's bar closes eagerly when full, so attach to the last
+            # bar that holds music rather than the fresh empty one that follows
+            target = self.bar if self.bar and self.bar.has_music() else None
+            if target is None:
+                for bar in reversed(self.insert_into.barlist):
+                    if bar.has_music():
+                        target = bar
+                        break
+            if target is None:
+                self.new_bar()
+                target = self.bar
+            target.add(barattr)
+
     def new_key(self, key_name, mode):
         if self.bar is None:
             self.new_bar()

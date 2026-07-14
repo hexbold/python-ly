@@ -138,7 +138,9 @@ class IterateXmlObjs():
                 obj.divs, obj.multirest)
         if obj.new_system:
             self.musxml.new_system(obj.new_system)
-        if obj.repeat:
+        if obj.ending:
+            self.musxml.add_ending(obj.ending[0], obj.ending[1], obj.ending[2])
+        elif obj.repeat:
             self.musxml.add_barline(obj.barline, obj.repeat)
         elif obj.barline:
             self.musxml.add_barline(obj.barline)
@@ -832,6 +834,7 @@ class BarAttr():
         self.divs = 0
         self.barline = None
         self.repeat = None
+        self.ending = None
         self.staves = 0
         self.multiclef = []
         self.tempo = None
@@ -860,6 +863,9 @@ class BarAttr():
 
     def set_barline(self, bl):
         self.barline = convert_barl(bl)
+
+    def set_ending(self, num, endtype, repeat=None):
+        self.ending = (num, endtype, repeat)
 
     def set_tempo(self, unit=0, unittype='', beats=0, dots=0, text=""):
         self.tempo = TempoDir(unit, unittype, beats, dots, text)
