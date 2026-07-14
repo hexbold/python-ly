@@ -151,6 +151,10 @@ def test_staff_attr_before_voice():
     compare_output('staff_attr_before_voice')
 
 
+def test_time_cut():
+    compare_output('time_cut')
+
+
 def ly_to_xml(filename):
     """Read Lilypond file and return XML string."""
     writer = ly.musicxml.writer()
