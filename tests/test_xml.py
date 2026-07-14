@@ -60,6 +60,10 @@ def test_final_barline():
     compare_output('final_barline')
 
 
+def test_final_barline_single():
+    compare_output('final_barline_single')
+
+
 def test_pianostaff_voices():
     compare_output('pianostaff_voices')
 

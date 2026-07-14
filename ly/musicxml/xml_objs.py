@@ -552,12 +552,16 @@ class Bar():
             backup_list = new_voice.obj_list[1:]
         else:
             backup_list = new_voice.obj_list
-        try:
-            if self.obj_list[-1].barline and new_voice.obj_list[-1].barline:
-                self.obj_list.pop()
-        except AttributeError:
-            pass
         if not self.is_skip(backup_list):
+            # drop our barline only when the incoming voice actually carries
+            # music to add (its own barline comes with it). A skip-only voice,
+            # e.g. the global section merged back into a single-staff part,
+            # is not added, so popping here would lose the barline for good.
+            try:
+                if self.obj_list[-1].barline and new_voice.obj_list[-1].barline:
+                    self.obj_list.pop()
+            except AttributeError:
+                pass
             self.create_backup()
 
             if active_slur_count:
