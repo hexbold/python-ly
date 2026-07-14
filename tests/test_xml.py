@@ -71,6 +71,10 @@ def test_pianostaff_voices():
 def test_marcato():
     compare_output('marcato')
 
+
+def test_tempo_range():
+    compare_output('tempo_range')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

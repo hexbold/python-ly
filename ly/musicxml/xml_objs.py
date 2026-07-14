@@ -913,9 +913,12 @@ class BarBackup():
 class TempoDir():
     """ Object that stores tempo direction information """
     def __init__(self, unit, unittype, beats, dots, text):
-        if unittype:
-            self.metr = unittype, beats
-            self.midi = self.set_midi_tempo(unit, beats, dots)
+        # beats is a list of bpm endpoints: [96] or a range [60, 72].
+        if unittype and beats and beats[0]:
+            per_minute = "-".join(str(b) for b in beats)
+            midi_beats = sum(beats) / len(beats)  # a range plays at its midpoint
+            self.metr = unittype, per_minute
+            self.midi = self.set_midi_tempo(unit, midi_beats, dots)
         else:
             self.metr = 0
             self.midi = 0

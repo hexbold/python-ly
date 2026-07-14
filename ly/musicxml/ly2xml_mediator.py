@@ -933,10 +933,8 @@ class Mediator():
 
     def new_tempo(self, unit, dur_tokens, tempo, string):
         dots, rs = self.duration_from_tokens(dur_tokens)
-        if tempo:
-            beats = tempo[0]
-        else:
-            beats = 0
+        # tempo is a list of endpoints: [96] for a plain tempo, [60, 72] for a range
+        beats = list(tempo) if tempo else []
         try:
             text = string.value()
         except AttributeError:
