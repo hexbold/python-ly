@@ -553,6 +553,8 @@ class ParseSource():
             self.mediator.new_trill_spanner()
         elif command.token == '\\stopTrillSpan':
             self.mediator.new_trill_spanner("stop")
+        elif command.token == '\\arpeggio':
+            self.mediator.new_arpeggio()
         elif command.token == '\\ottava':
             self.ottava = True
         elif command.token == '\\mark':

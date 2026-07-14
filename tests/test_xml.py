@@ -75,6 +75,10 @@ def test_marcato():
 def test_tempo_range():
     compare_output('tempo_range')
 
+
+def test_arpeggio():
+    compare_output('arpeggio')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 

@@ -507,6 +507,10 @@ class CreateMusicXML():
         self.add_notations()
         etree.SubElement(self.current_notation, "glissando", nodedict)
 
+    def add_arpeggiate(self):
+        self.add_notations()
+        etree.SubElement(self.current_notation, "arpeggiate")
+
     def add_technical(self):
         if self.current_tech is None:
             self.add_notations()

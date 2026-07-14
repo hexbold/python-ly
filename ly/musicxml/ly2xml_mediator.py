@@ -868,6 +868,11 @@ class Mediator():
     def new_chord_grace(self, slash=0):
         self.current_chord[-1].set_grace(slash)
 
+    def new_arpeggio(self):
+        chord = self.current_chord or ([self.current_note] if self.current_note else [])
+        for c in chord:
+            c.set_arpeggio()
+
     def new_gliss(self, line=None):
         if line:
             line = get_line_style(line)

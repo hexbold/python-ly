@@ -214,6 +214,8 @@ class IterateXmlObjs():
             self.musxml.add_tremolo(obj.tremolo[0], obj.tremolo[1])
         if obj.gliss:
             self.musxml.add_gliss(obj.gliss[0], obj.gliss[1], obj.gliss[2])
+        if obj.arpeggio:
+            self.musxml.add_arpeggiate()
         if obj.fingering:
             self.musxml.add_fingering(obj.fingering)
         if obj.lyric:
@@ -716,6 +718,7 @@ class BarNote(BarMus):
         self.tie = []
         self.grace = (0, 0)
         self.gliss = None
+        self.arpeggio = False
         self.tremolo = ('', 0)
         self.skip = False
         self.slur = []
@@ -755,6 +758,9 @@ class BarNote(BarMus):
 
     def set_grace(self, slash):
         self.grace = (1, slash)
+
+    def set_arpeggio(self):
+        self.arpeggio = True
 
     def set_gliss(self, line, endtype = "start", nr=1):
         if not line:
