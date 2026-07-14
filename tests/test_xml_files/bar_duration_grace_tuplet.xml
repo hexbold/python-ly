@@ -5,7 +5,7 @@
   <identification>
     <encoding>
       <software>python-ly 0.9.10</software>
-      <encoding-date>2026-07-11</encoding-date>
+      <encoding-date>2026-07-14</encoding-date>
     </encoding>
   </identification>
   <part-list>
@@ -30,7 +30,7 @@
         </clef>
       </attributes>
       <note>
-        <grace />
+        <grace slash="yes" />
         <pitch>
           <step>D</step>
           <octave>4</octave>

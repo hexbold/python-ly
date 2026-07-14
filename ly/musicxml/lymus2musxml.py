@@ -73,6 +73,7 @@ class ParseSource():
         self.tuplet = []
         self.scale = ''
         self.grace_seq = False
+        self.grace_slash = 0
         self.trem_rep = 0
         self.piano_staff = 0
         self.numericTime = False
@@ -329,7 +330,7 @@ class ParseSource():
                     self.check_tuplet()
                 # chord as grace note
                 if self.grace_seq:
-                    self.mediator.new_chord_grace()
+                    self.mediator.new_chord_grace(self.grace_slash)
 
     def Unpitched(self, unpitched):
         """A note without pitch, just a standalone duration."""
@@ -356,7 +357,7 @@ class ParseSource():
         """Generic check for all notes, both pitched and unpitched."""
         self.check_tuplet()
         if self.grace_seq:
-            self.mediator.new_grace()
+            self.mediator.new_grace(self.grace_slash)
         if self.trem_rep and not self.look_ahead(note, ly.music.items.Duration):
             self.mediator.set_tremolo(trem_type='start', repeats=self.trem_rep)
 
@@ -494,6 +495,8 @@ class ParseSource():
 
     def Grace(self, grace):
         self.grace_seq = True
+        # acciaccatura and slashedGrace print a slashed stem; grace and appoggiatura do not
+        self.grace_slash = 1 if grace.token in ('\\acciaccatura', '\\slashedGrace') else 0
 
     def TimeSignature(self, timeSign):
         self.mediator.new_time(timeSign.numerator(), timeSign.fraction(), self.numericTime)
@@ -678,6 +681,7 @@ class ParseSource():
             self.fraction = None
         elif isinstance(end.node, ly.music.items.Grace): #Grace
             self.grace_seq = False
+            self.grace_slash = 0
         elif end.node.token == '\\repeat':
             if end.node.specifier() == 'volta':
                 self.mediator.new_repeat('backward')

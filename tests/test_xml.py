@@ -79,6 +79,10 @@ def test_tempo_range():
 def test_arpeggio():
     compare_output('arpeggio')
 
+
+def test_grace_slash():
+    compare_output('grace_slash')
+
 def test_merge_voice_slurs():
     compare_output('merge_voice_slurs')
 
