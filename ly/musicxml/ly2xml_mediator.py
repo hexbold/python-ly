@@ -70,6 +70,7 @@ class Mediator():
         self.store_unset_staff = False
         self.staff_unset_notes = {}
         self.lyric_sections = {}
+        self.named_sections = {}
         self.lyric = None
         self.lyric_syll = False
         self.lyric_nr = 1
@@ -90,6 +91,10 @@ class Mediator():
 
     def new_header_assignment(self, name, value):
         """Distributing header information."""
+        if not value:
+            # Scheme values stringify to '' (e.g. the ubiquitous tagline = ##f);
+            # emitting them made empty elements like <rights/>.
+            return
         creators = ['composer', 'arranger', 'poet', 'lyricist']
         if name == 'title':
             self.score.title = value
@@ -105,6 +110,12 @@ class Mediator():
         section = xml_objs.ScoreSection(name, glob)
         self.insert_into = section
         self.sections.append(section)
+        # Sections are popped from self.sections when merged into their part,
+        # but a \lyricsto may reference the voice AFTER that (a Lyrics context
+        # written as a sibling of the staff). Keep every section reachable by
+        # name; the bars are shared with the part, so a late lyrics merge still
+        # lands in the output. First occurrence wins, like get_var_byname.
+        self.named_sections.setdefault(name, section)
         self.bar = None
 
     def new_snippet(self, name):
@@ -274,6 +285,12 @@ class Mediator():
             self.lyric[1] = 'end'
         lyrics_section = self.lyric_sections['lyricsto'+voice_id]
         voice_section = self.get_var_byname(lyrics_section.voice_id)
+        if not voice_section:
+            # The voice's section may already be merged into its part and gone
+            # from self.sections — the normal case when the Lyrics context is a
+            # SIBLING of the staff (\new Staff {...} \new Lyrics \lyricsto ...).
+            # Its bars are shared with the part, so merging lyrics still works.
+            voice_section = self.named_sections.get(lyrics_section.voice_id)
         if voice_section:
             voice_section.merge_lyrics(lyrics_section)
         else:

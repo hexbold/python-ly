@@ -76,7 +76,14 @@ class CreateMusicXML():
         """Create score info."""
         info_node = etree.Element(tag, attr)
         info_node.text = info
-        self.score_info.insert(0, info_node)
+        # Keep document order = call order, ahead of the <encoding> block created
+        # at init: identification wants creator*, rights*, encoding. Prepending
+        # reversed the call order, putting <rights> before <creator>.
+        for i, child in enumerate(self.score_info):
+            if child.tag == "encoding":
+                self.score_info.insert(i, info_node)
+                return
+        self.score_info.append(info_node)
 
     def create_partgroup(self, gr_type, num, name=None, abbr=None, symbol=None):
         """Create a new part group."""

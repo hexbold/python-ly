@@ -56,6 +56,19 @@ def test_navigation():
     compare_output('navigation')
 
 
+def test_lyrics_sibling():
+    # A \lyricsto Lyrics context that is a SIBLING of the staff (the idiomatic
+    # song layout) must still reach its voice, whose section is already merged
+    # into the part when the lyrics arrive.
+    compare_output('lyrics_sibling')
+
+
+def test_header_tagline():
+    # Empty header values (tagline = ##f) must be skipped, and identification
+    # children must keep call order (creator before rights, before encoding).
+    compare_output('header_tagline')
+
+
 def test_tremolo_repeat():
     compare_output('tremolo_repeat')
 
