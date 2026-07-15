@@ -665,6 +665,13 @@ class CreateMusicXML():
         wordsnode = etree.SubElement(dirtypenode, "words")
         wordsnode.text = words.rstrip()
 
+    def add_navigation(self, kind):
+        """Add a segno or coda sign. These are navigation elements of their own, not a
+        rehearsal mark: a reader follows them for D.S. and D.C. jumps."""
+        direction = etree.SubElement(self.current_bar, "direction", placement="above")
+        dirtypenode = etree.SubElement(direction, "direction-type")
+        etree.SubElement(dirtypenode, kind)
+
     def add_mark(self, mark):
         """Add rehearsal mark in direction"""
         if self.current_bar.find('direction') is None:

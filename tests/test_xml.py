@@ -52,6 +52,14 @@ def test_beams():
     compare_output('beams')
 
 
+def test_navigation():
+    compare_output('navigation')
+
+
+def test_tremolo_repeat():
+    compare_output('tremolo_repeat')
+
+
 def test_variable_dotted():
     compare_output('variable_dotted')
 

@@ -52,6 +52,39 @@ staff_contexts = ['Staff', 'RhythmicStaff', 'TabStaff',
 
 part_contexts = pno_contexts + staff_contexts
 
+# LilyPond glyphs that mean a MusicXML navigation element rather than a rehearsal mark.
+NAVIGATION_GLYPHS = {
+    'scripts.segno': 'segno',
+    'scripts.coda': 'coda',
+    'scripts.varcoda': 'coda',
+}
+
+
+def count_notes(node):
+    r"""How many notes a \repeat tremolo group holds. Two of them make a two-note tremolo,
+    which is notated and timed differently from a single-note one."""
+    total = 0
+    for child in node:
+        if isinstance(child, ly.music.items.Note):
+            total += 1
+        else:
+            total += count_notes(child)
+    return total
+
+
+def musicglyph_name(node):
+    r"""The glyph of a \musicglyph inside a markup, or None if there is none."""
+    for child in node:
+        if (isinstance(child, ly.music.items.MarkupCommand)
+                and child.token == '\\musicglyph'):
+            for arg in child:
+                if isinstance(arg, ly.music.items.String):
+                    return arg.value()
+        found = musicglyph_name(child)
+        if found:
+            return found
+    return None
+
 
 class End():
     """ Extra class that gives information about the end of Container
@@ -78,6 +111,7 @@ class ParseSource():
         self.alt_index = 0
         self.alt_total = 0
         self.trem_rep = 0
+        self.trem_notes = 1
         self.piano_staff = 0
         self.numericTime = False
         self.voice_sep = False
@@ -367,7 +401,8 @@ class ParseSource():
         if self.grace_seq:
             self.mediator.new_grace(self.grace_slash)
         if self.trem_rep and not self.look_ahead(note, ly.music.items.Duration):
-            self.mediator.set_tremolo(trem_type='start', repeats=self.trem_rep)
+            self.mediator.set_tremolo(trem_type='start', repeats=self.trem_rep,
+                                      notes=self.trem_notes)
 
     def check_tuplet(self):
         """Generic tuplet check."""
@@ -414,7 +449,8 @@ class ParseSource():
         else:
             self.mediator.new_duration_token(duration.token, duration.tokens)
             if self.trem_rep:
-                self.mediator.set_tremolo(trem_type='start', repeats=self.trem_rep)
+                self.mediator.set_tremolo(trem_type='start', repeats=self.trem_rep,
+                                          notes=self.trem_notes)
 
     def Tempo(self, tempo):
         """ Tempo direction, e g '4 = 80' """
@@ -515,6 +551,7 @@ class ParseSource():
             self.mediator.new_repeat('forward')
         elif repeat.specifier() == 'tremolo':
             self.trem_rep = repeat.repeat_count()
+            self.trem_notes = count_notes(repeat)
 
     def Alternative(self, alternative):
         r"""\alternative { {..} {..} } after a \repeat volta: the endings become volta brackets."""
@@ -582,6 +619,10 @@ class ParseSource():
         elif command.token == '\\mark':
             self.mark = True
             self.mediator.new_mark()
+        elif command.token == '\\segnoMark':
+            self.mediator.new_navigation('segno')
+        elif command.token == '\\codaMark':
+            self.mediator.new_navigation('coda')
         elif command.token == '\\breathe':
             art = type('',(object,),{"token": "\\breathe"})()
             self.Articulation(art)
@@ -611,7 +652,14 @@ class ParseSource():
             self.tupl_span = True
 
     def Markup(self, markup):
-        pass
+        r"""A \markup. The only one handled here is the classic way of writing a navigation
+        sign, \mark \markup { \musicglyph "scripts.segno" }, which is a segno and not the
+        rehearsal letter \mark alone would make of it."""
+        if self.mark:
+            self.mark = False
+            nav = NAVIGATION_GLYPHS.get(musicglyph_name(markup))
+            if nav:
+                self.mediator.mark_as_navigation(nav)
 
     def MarkupWord(self, markupWord):
         self.mediator.new_word(markupWord.token)
@@ -714,11 +762,15 @@ class ParseSource():
                     self.mediator.new_repeat('backward')
                 self.alt_active = False
             elif end.node.specifier() == 'tremolo':
-                if self.look_ahead(end.node, ly.music.items.MusicList):
+                # What decides start/stop vs single is how many notes the group holds, not
+                # whether it is braced: \repeat tremolo 8 { c16 } is braced too, and it is
+                # a single-note tremolo.
+                if self.trem_notes > 1:
                     self.mediator.set_tremolo(trem_type="stop")
                 else:
                     self.mediator.set_tremolo(trem_type="single")
                 self.trem_rep = 0
+                self.trem_notes = 1
         elif isinstance(end.node, ly.music.items.Context):
             self.in_context = False
             if end.node.context() == 'Voice':

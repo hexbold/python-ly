@@ -84,6 +84,7 @@ class Mediator():
         self.multiple_rest = False
         self.multiple_rest_bar = None
         self.current_mark = 1
+        self.current_mark_attr = None
         self.bar_is_pickup = False
         self.stem_dir = None
 
@@ -475,17 +476,38 @@ class Mediator():
             if self.bar is None:
                 self.new_bar()
             if self.bar.has_attr():
-                self.current_attr.set_mark(self.bijective(self.current_mark))
+                self.current_mark_attr = self.current_attr
             else:
-                new_bar_attr = xml_objs.BarAttr()
-                new_bar_attr.set_mark(self.bijective(self.current_mark))
-                self.add_to_bar(new_bar_attr)
+                self.current_mark_attr = xml_objs.BarAttr()
+                self.add_to_bar(self.current_mark_attr)
+            self.current_mark_attr.set_mark(self.bijective(self.current_mark))
         elif num_mark <= 0:
             print("Mark value out of range")
         else:
             self.current_mark = num_mark
+            self.current_mark_attr = self.current_attr
             self.current_attr.set_mark(self.bijective(self.current_mark))
         self.current_mark += 1
+
+    def new_navigation(self, kind):
+        r"""\segnoMark / \codaMark: a sign a reader jumps to, not a rehearsal letter."""
+        if self.bar is None:
+            self.new_bar()
+        if self.bar.has_attr():
+            attr = self.current_attr
+        else:
+            attr = xml_objs.BarAttr()
+            self.add_to_bar(attr)
+        attr.set_navigation(kind)
+
+    def mark_as_navigation(self, kind):
+        r"""The \mark's markup turned out to be a segno or coda glyph, so it is a navigation
+        sign after all. It also gives back the rehearsal letter it just took."""
+        if self.current_mark_attr is not None:
+            self.current_mark_attr.set_mark(None)
+            self.current_mark_attr.set_navigation(kind)
+            self.current_mark -= 1
+            self.current_mark_attr = None
 
     def new_word(self, word):
         if self.bar is None:
@@ -935,15 +957,21 @@ class Mediator():
             n = 1
         note.set_gliss(line, endtype="stop", nr=n)
 
-    def set_tremolo(self, trem_type='single', duration=0, repeats=0):
+    def set_tremolo(self, trem_type='single', duration=0, repeats=0, notes=1):
         if self.current_note.tremolo[1]: #tremolo already set
             self.current_note.set_tremolo(trem_type)
         else:
             if repeats:
                 duration = int(self.dur_token)
-                bs, durtype = calc_trem_dur(repeats, self.current_note.duration, duration)
+                bs, durtype = calc_trem_dur(repeats, self.current_note.duration,
+                                            duration, notes)
                 self.current_note.duration = bs
                 self.current_note.type = durtype
+                if notes > 1:
+                    # Both notes of a two-note tremolo are written with the whole span but
+                    # each only sounds for its share of it. That gap between written and
+                    # sounding is what time-modification records.
+                    self.current_note.trem_time_mod = (notes, 1)
             elif not duration:
                 duration = self.prev_tremolo
             else:
@@ -1241,9 +1269,14 @@ def artic_token2xml_name(art_token):
         else:
             return False
 
-def calc_trem_dur(repeats, base_scaling, duration):
+def calc_trem_dur(repeats, base_scaling, duration, notes=1):
     """ Calculate tremolo duration from number of
-    repeats and initial duration. """
+    repeats and initial duration.
+
+    A note sounds for `repeats` times its written length. A two-note tremolo is notated
+    with each note carrying the tremolo's WHOLE span, so its written type is `notes` times
+    longer than it sounds: LilyPond draws a bar-long two-note tremolo as two whole notes,
+    not two halves. The sounding length (new_base) is unaffected. """
     base = base_scaling[0]
     scale = base_scaling[1]
     new_base = base * repeats
@@ -1251,8 +1284,11 @@ def calc_trem_dur(repeats, base_scaling, duration):
         import ly.duration
         trem_length = ly.duration.tostring(int((repeats // duration) * -0.5))
     else:
-        trem_length = str(duration // repeats)
-    new_type = xml_objs.durval2type(trem_length)
+        trem_length = str(duration // repeats // notes)
+    # durval2type lives here, not in xml_objs. Reaching for it there raised an
+    # AttributeError that the item dispatch swallowed as "Duration not implemented",
+    # so every \repeat tremolo silently kept its written duration.
+    new_type = durval2type(trem_length)
     return (new_base, scale), new_type
 
 def get_line_style(style):

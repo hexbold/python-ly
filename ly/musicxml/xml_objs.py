@@ -277,7 +277,9 @@ class IterateXmlObjs():
         if obj.tempo:
             self.musxml.create_tempo(obj.tempo.text, obj.tempo.metr,
                                      obj.tempo.midi, obj.tempo.dots)
-        if obj.mark:
+        if obj.navigation:
+            self.musxml.add_navigation(obj.navigation)
+        elif obj.mark:
             self.musxml.add_mark(obj.mark)
         if obj.word:
             self.musxml.add_dirwords(obj.word)
@@ -329,6 +331,8 @@ class IterateXmlObjs():
             self.musxml.new_note(obj.base_note, obj.octave, obj.type, divdur,
                 obj.alter, obj.accidental_token, obj.voice, obj.dot, obj.chord,
                 obj.grace, obj.stem_direction, obj.show_accidental)
+            if obj.trem_time_mod:
+                self.musxml.add_time_modify(obj.trem_time_mod)
         for t in obj.tie:
             self.musxml.tie_note(t)
         for s in obj.slur:
@@ -856,6 +860,7 @@ class BarNote(BarMus):
         self.gliss = None
         self.arpeggio = False
         self.tremolo = ('', 0)
+        self.trem_time_mod = None
         self.skip = False
         self.slur = []
         self.artic = []
@@ -974,6 +979,7 @@ class BarAttr():
         self.tempo = None
         self.multirest = None
         self.mark = None
+        self.navigation = None
         self.word = None
         self.new_system = None
 
@@ -1012,6 +1018,9 @@ class BarAttr():
 
     def set_mark(self, mark):
         self.mark = mark
+
+    def set_navigation(self, kind):
+        self.navigation = kind
 
     def set_word(self, words):
         if self.word == None:
