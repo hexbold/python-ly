@@ -53,6 +53,9 @@ from __future__ import print_function
 
 from fractions import Fraction
 
+from . import beaming
+
+
 class IterateXmlObjs():
     """
     A ly.musicxml.xml_objs.Score object is iterated and the Music XML node tree
@@ -98,6 +101,7 @@ class IterateXmlObjs():
         """The part is iterated."""
         if part.barlist:
             self.key_alters = {}
+            self.time_sig = (4, 4)  # LilyPond's default until a \time says otherwise
             last_bar = part.barlist[-1]
             last_bar_objs = last_bar.obj_list
             part.set_first_bar(self.divisions)
@@ -116,7 +120,9 @@ class IterateXmlObjs():
 
     def iterate_bar(self, bar):
         """The objects in the bar are output to the xml-file."""
-        self.set_accidentals(bar)
+        events = self.bar_events_in_sound_order(bar)
+        self.set_accidentals(events)
+        self.set_beams(events)
         self.musxml.create_measure(pickup = bar.pickup)
         for obj in bar.obj_list:
             if isinstance(obj, BarAttr):
@@ -133,33 +139,93 @@ class IterateXmlObjs():
                 divdur = self.count_duration(obj.duration, self.divisions)
                 self.musxml.add_backup(divdur)
 
-    def bar_notes_in_sound_order(self, bar):
-        """The bar's pitched notes in sounding order, each with the key in force.
+    def bar_events_in_sound_order(self, bar):
+        """The bar's notes and rests in sounding order, each with the key in force.
 
         obj_list is in file order, where a backup rewinds the clock so a second voice can
-        replay the bar. A note written later can sound earlier, and accidentals follow the
-        ear, so order by onset before deciding which ones print.
+        replay the bar. A note written later can sound earlier, and both accidentals and
+        beams follow the ear, so order by onset before deciding anything. Onsets are in
+        divisions; also picks up the key and time signature this bar is under.
         """
-        notes = []
-        pos = 0
-        onset = 0
+        events = []
+        pos = Fraction(0)
+        onset = Fraction(0)
         for obj in bar.obj_list:
             if isinstance(obj, BarAttr):
                 if obj.key is not None:
                     self.key_alters = key_alterations(obj.key)
+                if isinstance(obj.time, list) and len(obj.time) >= 2:
+                    self.time_sig = (obj.time[0], obj.time[1])
             elif isinstance(obj, BarBackup):
-                pos -= self.count_duration(obj.duration, self.divisions)
+                pos -= Fraction(obj.duration[0]) * Fraction(obj.duration[1])
             elif isinstance(obj, BarMus):
                 if not obj.chord:  # a chord note sounds with the note that opened it
                     onset = pos
                     if not (isinstance(obj, BarNote) and obj.grace[0]):
-                        pos += self.count_duration(obj.duration, self.divisions)
-                if isinstance(obj, BarNote) and not isinstance(obj, Unpitched):
-                    notes.append((onset, obj, self.key_alters))
-        notes.sort(key=lambda n: n[0])
-        return [(obj, key_alters) for onset, obj, key_alters in notes]
+                        pos += event_length(obj)
+                events.append((onset, obj, self.key_alters))
+        events.sort(key=lambda e: e[0])
+        return events
 
-    def set_accidentals(self, bar):
+    def set_beams(self, events):
+        """Group the bar's notes into the beams LilyPond would engrave.
+
+        A source almost never writes beams out with [ ], they come from LilyPond's automatic
+        beaming, so ly.musicxml.beaming applies the same rules here (see that module). A run
+        of beamable notes in one voice is cut wherever the rules say a beam has to end, and
+        also by anything unbeamable in between: a rest, a note of a quarter or longer, or
+        \\autoBeamOff. Manual [ ] wins over all of it, including \\autoBeamOff. A run of one
+        note gets no beam, it keeps its flag.
+        """
+        num, den = self.time_sig
+        voices = {}
+        for onset, obj, _ in events:
+            if not obj.chord:  # a chord's beam belongs to the note that opened it
+                voices.setdefault((obj.staff, obj.voice), []).append((onset, obj))
+        for items in voices.values():
+            run, grace_run, manual = [], [], False
+            for onset, obj in items:
+                note = obj if isinstance(obj, BarNote) else None
+                if note is not None and note.grace[0]:
+                    # Grace notes beam among themselves and also cut the run they sit in,
+                    # so \\grace { e16 f } between two eighths splits their beam in two.
+                    run, manual = self._flush_beams(run), False
+                    if beaming.BEAM_COUNT.get(note.type, 0):
+                        grace_run.append(note)
+                    else:
+                        grace_run = self._flush_beams(grace_run)
+                    continue
+                grace_run = self._flush_beams(grace_run)
+                if note is not None and note.manual_beam == 'start':
+                    run = self._flush_beams(run)
+                    manual = True
+                if note is None or not beaming.BEAM_COUNT.get(note.type, 0):
+                    run, manual = self._flush_beams(run), False
+                    continue
+                if not manual:
+                    if not note.auto_beam:
+                        run = self._flush_beams(run)
+                        continue
+                    # The rules are applied to the shortest note the beam carries, which is
+                    # why a 16th among eighths regroups the whole run onto beats.
+                    shortest = min([event_length(n) for n in run] + [event_length(note)])
+                    if run and beaming.beam_ends_at(onset, shortest, num, den):
+                        run = self._flush_beams(run)
+                run.append(note)
+                if note.manual_beam == 'stop':
+                    run, manual = self._flush_beams(run), False
+            self._flush_beams(run)
+            self._flush_beams(grace_run)
+
+    def _flush_beams(self, run):
+        """Assign beam levels to a finished run and return a fresh one."""
+        if len(run) > 1:
+            counts = [beaming.BEAM_COUNT.get(n.type, 0) for n in run]
+            for note, states in zip(run, beaming.beam_states(counts)):
+                note.beams = states
+        return []
+
+    def set_accidentals(self, events):
         """Work out which notes in the bar print an accidental.
 
         A sign is printed when the note's alteration differs from the one already in force
@@ -175,7 +241,9 @@ class IterateXmlObjs():
         """
         in_force = {}
         restate = set()
-        for note, key_alters in self.bar_notes_in_sound_order(bar):
+        for onset, note, key_alters in events:
+            if not isinstance(note, BarNote) or isinstance(note, Unpitched):
+                continue
             ident = (note.staff, note.base_note, note.octave)
             current = in_force.get(ident, key_alters.get(note.base_note, 0))
             if 'stop' in note.tie:
@@ -246,6 +314,8 @@ class IterateXmlObjs():
                                         self.divisions, t.acttype, t.normtype)
         if obj.staff and not obj.skip:
             self.musxml.add_staff(obj.staff)
+        for nr, beam_type in getattr(obj, 'beams', []):
+            self.musxml.add_beam(nr, beam_type)
         if obj.other_notation:
             self.musxml.add_named_notation(obj.other_notation)
 
@@ -564,18 +634,21 @@ class Bar():
         merged bar starts with only attributes — e.g. a staff bar holding
         just clef/time that voices are merged into. add_backup() silently
         drops a 0 duration, so the voices then played sequentially.
+
+        Sum the sounding lengths: a grace note takes no time in the measure and a
+        tuplet note is shorter than it is written. Adding the written durations up
+        instead overshoots the start of the measure and lands the next voice early
+        (an eighth early after one acciaccatura).
         """
-        b = 0
-        s = 1
+        length = Fraction(0)
         for obj in self.obj_list:
-            if isinstance(obj, BarMus):
-                if not obj.chord:
-                    b += obj.duration[0]
-                    s *= obj.duration[1]
-            elif isinstance(obj, BarBackup):
-                b = 0
-                s = 1
-        self.add(BarBackup((b, s)))
+            if isinstance(obj, BarBackup):
+                length = Fraction(0)
+            elif isinstance(obj, BarMus) and not obj.chord:
+                if isinstance(obj, BarNote) and obj.grace[0]:
+                    continue
+                length += event_length(obj)
+        self.add(BarBackup((length, 1)))
 
     def is_skip(self, obj_list=None):
         """ Check if bar has nothing but skips. """
@@ -775,6 +848,9 @@ class BarNote(BarMus):
         self.octave = None
         self.accidental_token = accidental
         self.show_accidental = False
+        self.manual_beam = None
+        self.auto_beam = True
+        self.beams = []
         self.tie = []
         self.grace = (0, 0)
         self.gliss = None
@@ -1012,6 +1088,17 @@ class TempoDir():
 ##
 # Translation functions
 ##
+
+def event_length(obj):
+    """A note's or rest's real length in whole notes.
+
+    ly.music durations carry no tuplet scaling (the exporter applies it later in
+    tuplet_note), so fold the active tuplet fractions in here to get the sounding length.
+    """
+    length = Fraction(obj.duration[0]) * Fraction(obj.duration[1])
+    for t in obj.tuplet:
+        length *= Fraction(t.fraction[1], t.fraction[0])
+    return length
 
 def key_alterations(fifths):
     """The alteration every note of a step carries from the key signature."""

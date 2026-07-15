@@ -384,9 +384,10 @@ class CreateMusicXML():
         etree.SubElement(self.current_note, "dot")
 
     def add_beam(self, nr, beam_type):
-        """Add beam. """
-        beam_node = etree.SubElement(self.current_notation, "beam", number=str(nr))
+        """Add beam. A child of <note> before <notations>, not inside it."""
+        beam_node = etree.Element("beam", number=str(nr))
         beam_node.text = beam_type
+        self._insert_before(beam_node, ("notations",))
 
     def add_tie(self, tie_type):
         """Create node tie (used for sound of tie) """
@@ -599,16 +600,16 @@ class CreateMusicXML():
     def add_staff(self, staff):
         staffnode = etree.Element("staff")
         staffnode.text = str(staff)
-        # Insert <staff> before <notations> to comply with MusicXML element order
-        notations_index = None
+        # <staff> comes before <beam> and <notations> in MusicXML element order
+        self._insert_before(staffnode, ("beam", "notations"))
+
+    def _insert_before(self, node, tags):
+        """Put node in the current note ahead of the first of tags, or at the end."""
         for i, child in enumerate(self.current_note):
-            if child.tag == "notations":
-                notations_index = i
-                break
-        if notations_index is not None:
-            self.current_note.insert(notations_index, staffnode)
-        else:
-            self.current_note.append(staffnode)
+            if child.tag in tags:
+                self.current_note.insert(i, node)
+                return
+        self.current_note.append(node)
 
     def add_staves(self, staves):
         index = get_tag_index(self.bar_attr, "time")

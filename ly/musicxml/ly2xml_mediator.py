@@ -47,6 +47,7 @@ class Mediator():
         self.current_note = None
         self.current_lynote = None
         self.current_is_rest = False
+        self.auto_beaming = True
         self.current_time = Fraction(4, 4)
         self.bar_dura = Fraction(0, 4)
         self.action_onnext = []
@@ -615,6 +616,7 @@ class Mediator():
             if self.tied:
                 self.current_note.set_tie('stop')
                 self.tied = False
+            self.current_note.auto_beam = self.auto_beaming
         self.check_duration(rest)
         self.check_divs()
         if self.staff:
@@ -850,6 +852,14 @@ class Mediator():
 
         if slur_type == 'start':
             self.slur_stack.append(self.current_note.slur[-1])
+
+    def set_manual_beam(self, token):
+        """Set a manual beam '[' or ']' on the current note, overriding auto beaming."""
+        self.current_note.manual_beam = 'start' if token == '[' else 'stop'
+
+    def set_auto_beaming(self, value):
+        r"""\autoBeamOff / \autoBeamOn. Applies to every note from here on."""
+        self.auto_beaming = value
 
     def new_articulation(self, art_token):
         """

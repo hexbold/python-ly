@@ -475,7 +475,8 @@ class ParseSource():
         pass
 
     def Beam(self, beam):
-        pass
+        """ Manual beam, '[' = start, ']' = stop. """
+        self.mediator.set_manual_beam(beam.token)
 
     def Slur(self, slur):
         """ Slur, '(' = start, ')' = stop. """
@@ -592,6 +593,10 @@ class ParseSource():
                 self.tupl_span = False
             elif self.mark:
                 self.mark = False
+        elif command.token == '\\autoBeamOff':
+            self.mediator.set_auto_beaming(False)
+        elif command.token == '\\autoBeamOn':
+            self.mediator.set_auto_beaming(True)
         elif command.token == '\\compressFullBarRests':
             self.mediator.set_mult_rest()
         elif command.token == '\\break':

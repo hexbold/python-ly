@@ -48,6 +48,10 @@ def test_accidental_rule():
     compare_output('accidental_rule')
 
 
+def test_beams():
+    compare_output('beams')
+
+
 def test_variable_dotted():
     compare_output('variable_dotted')
 
