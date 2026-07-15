@@ -1,12 +1,12 @@
 \version "2.24.0"
 
 % <accidental> is a display element: "this notehead carries a printed
-% accidental". The sounding pitch is fully described by <alter>, and
-% importers derive printed accidentals from <alter> + key signature +
-% measure context. Emitting <accidental> on every altered note forced a
-% redundant printed flat/sharp on every key-signature-covered note.
-% Only explicit LilyPond accidentals may emit it: ! (forced) and
-% ? (cautionary).
+% accidental". The sounding pitch is fully described by <alter>, so a note
+% already covered by the key signature must not emit one: doing that on
+% every altered note forced a redundant printed flat/sharp on every
+% key-signature-covered note. Explicit ! (forced) and ? (cautionary) always
+% emit. Where an accidental IS notated is decided by the accidental rule,
+% covered in accidental_rule.ly.
 
 \score {
   \new Staff {

@@ -97,6 +97,7 @@ class IterateXmlObjs():
     def iterate_part(self, part):
         """The part is iterated."""
         if part.barlist:
+            self.key_alters = {}
             last_bar = part.barlist[-1]
             last_bar_objs = last_bar.obj_list
             part.set_first_bar(self.divisions)
@@ -115,6 +116,7 @@ class IterateXmlObjs():
 
     def iterate_bar(self, bar):
         """The objects in the bar are output to the xml-file."""
+        self.set_accidentals(bar)
         self.musxml.create_measure(pickup = bar.pickup)
         for obj in bar.obj_list:
             if isinstance(obj, BarAttr):
@@ -130,6 +132,61 @@ class IterateXmlObjs():
             elif isinstance(obj, BarBackup):
                 divdur = self.count_duration(obj.duration, self.divisions)
                 self.musxml.add_backup(divdur)
+
+    def bar_notes_in_sound_order(self, bar):
+        """The bar's pitched notes in sounding order, each with the key in force.
+
+        obj_list is in file order, where a backup rewinds the clock so a second voice can
+        replay the bar. A note written later can sound earlier, and accidentals follow the
+        ear, so order by onset before deciding which ones print.
+        """
+        notes = []
+        pos = 0
+        onset = 0
+        for obj in bar.obj_list:
+            if isinstance(obj, BarAttr):
+                if obj.key is not None:
+                    self.key_alters = key_alterations(obj.key)
+            elif isinstance(obj, BarBackup):
+                pos -= self.count_duration(obj.duration, self.divisions)
+            elif isinstance(obj, BarMus):
+                if not obj.chord:  # a chord note sounds with the note that opened it
+                    onset = pos
+                    if not (isinstance(obj, BarNote) and obj.grace[0]):
+                        pos += self.count_duration(obj.duration, self.divisions)
+                if isinstance(obj, BarNote) and not isinstance(obj, Unpitched):
+                    notes.append((onset, obj, self.key_alters))
+        notes.sort(key=lambda n: n[0])
+        return [(obj, key_alters) for onset, obj, key_alters in notes]
+
+    def set_accidentals(self, bar):
+        """Work out which notes in the bar print an accidental.
+
+        A sign is printed when the note's alteration differs from the one already in force
+        for its staff, step and octave, which is the key signature until some earlier note
+        in the bar overrides it.
+
+        A note tied from the previous one never prints a sign of its own. If it would have
+        needed one, the tie swallowed it and the bar is left without a visible statement of
+        that pitch, so the next note of the same pitch has to restate it whatever it turns
+        out to be: after cs'1~ the bar's next c' prints a natural and its next cs' prints a
+        sharp again. A tie that needed no sign in the first place changes nothing. This
+        matches what LilyPond engraves.
+        """
+        in_force = {}
+        restate = set()
+        for note, key_alters in self.bar_notes_in_sound_order(bar):
+            ident = (note.staff, note.base_note, note.octave)
+            current = in_force.get(ident, key_alters.get(note.base_note, 0))
+            if 'stop' in note.tie:
+                note.show_accidental = False
+                if note.alter != current:
+                    restate.add(ident)
+                continue
+            note.show_accidental = note.alter != current or ident in restate
+            restate.discard(ident)
+            if note.show_accidental:
+                in_force[ident] = note.alter
 
     def new_xml_bar_attr(self, obj):
         """Create bar attribute xml-nodes."""
@@ -201,7 +258,7 @@ class IterateXmlObjs():
         else:
             self.musxml.new_note(obj.base_note, obj.octave, obj.type, divdur,
                 obj.alter, obj.accidental_token, obj.voice, obj.dot, obj.chord,
-                obj.grace, obj.stem_direction)
+                obj.grace, obj.stem_direction, obj.show_accidental)
         for t in obj.tie:
             self.musxml.tie_note(t)
         for s in obj.slur:
@@ -717,6 +774,7 @@ class BarNote(BarMus):
         self.alter = alter
         self.octave = None
         self.accidental_token = accidental
+        self.show_accidental = False
         self.tie = []
         self.grace = (0, 0)
         self.gliss = None
@@ -954,6 +1012,14 @@ class TempoDir():
 ##
 # Translation functions
 ##
+
+def key_alterations(fifths):
+    """The alteration every note of a step carries from the key signature."""
+    if fifths > 0:
+        return dict.fromkeys('FCGDAEB'[:fifths], 1)
+    elif fifths < 0:
+        return dict.fromkeys('BEADGCF'[:-fifths], -1)
+    return {}
 
 def dur2lines(dur):
     if dur == 8:

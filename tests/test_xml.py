@@ -44,6 +44,10 @@ def test_accidental_display():
     compare_output('accidental_display')
 
 
+def test_accidental_rule():
+    compare_output('accidental_rule')
+
+
 def test_variable_dotted():
     compare_output('variable_dotted')
 

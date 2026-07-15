@@ -140,7 +140,8 @@ class CreateMusicXML():
     ##
 
     def new_note(self, step, octave, durtype, divdur, alter=0,
-                 acc_token=0, voice=1, dot=0, chord=0, grace=(0, 0), stem_dir=0):
+                 acc_token=0, voice=1, dot=0, chord=0, grace=(0, 0), stem_dir=0,
+                 show_accidental=False):
         """Create all nodes needed for a normal note. """
         self.create_note()
         if grace[0]:
@@ -155,16 +156,16 @@ class CreateMusicXML():
         if dot:
             for i in range(dot):
                 self.add_dot()
-        # FIX: emit <accidental> only for explicit LilyPond accidentals
-        # (! forced, ? cautionary). <accidental> is a DISPLAY element; the
-        # sounding pitch is fully described by <alter>, and notation software
-        # derives printed accidentals from <alter> + key signature. Emitting
-        # it unconditionally forced a redundant printed accidental on every
-        # altered note (e.g. flats on all diatonic b/es/as in Es-Dur).
+        # <accidental> is the printed sign, <alter> is the pitch. They are independent:
+        # consumers do NOT re-derive the sign (Verovio draws none without it), so the
+        # caller applies the accidental rule and passes the answer in show_accidental.
+        # ! and ? are explicit LilyPond requests and always print.
         if acc_token == '!': # forced/reminder accidental
             self.add_accidental(alter, caut=True)
         elif acc_token == '?': # cautionary, in parentheses
             self.add_accidental(alter, parenth=True)
+        elif show_accidental:
+            self.add_accidental(alter)
         if stem_dir:
             self.set_stem_dir(stem_dir)
 
