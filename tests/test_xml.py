@@ -124,6 +124,14 @@ def test_variable_dotted():
     compare_output('variable_dotted')
 
 
+def test_variable_simultaneous():
+    # A variable whose WHOLE BODY is << { } \\ { } >> (no outer braces): the
+    # substituted container never got its End event (iter_score tested the
+    # UserCommand, not the substituted node), so the block's first voice was
+    # dropped silently and every note after it shifted to voice 2.
+    compare_output('variable_simultaneous')
+
+
 def test_quoted_vars():
     # Quoted assignments ("mel.1" = ...) referenced as \"mel.1" used to be
     # dropped silently (exit 0, zero notes): the lexer had no rule for a

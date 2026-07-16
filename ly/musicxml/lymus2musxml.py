@@ -958,8 +958,14 @@ class ParseSource():
                 yield n
                 for c in self.iter_score(n, doc):
                     yield c
-                if isinstance(s, ly.music.items.Container):
-                    yield End(s)
+                # End the node that was actually ITERATED: when s is a variable
+                # reference (UserCommand), n is its substituted value — testing s
+                # meant a container-valued variable (`up.2 = << {..} \\ {..} >>`)
+                # never got its End event, so the `<<` voices were never merged
+                # back (voice one vanished) and the voice number never reverted
+                # (every later note shifted to voice 2).
+                if isinstance(n, ly.music.items.Container):
+                    yield End(n)
 
     def unfold_repeat(self, repeat_node, repeat_count, doc):
         r"""
