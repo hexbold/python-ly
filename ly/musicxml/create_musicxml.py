@@ -61,6 +61,7 @@ class CreateMusicXML():
         encoding_date.text = str(datetime.date.today())
         self.partlist = etree.SubElement(self.root, "part-list")
         self.part_count = 1
+        self.direction = None
 
     ##
     # Building the basic Elements
@@ -139,6 +140,10 @@ class CreateMusicXML():
             self.current_bar = etree.SubElement(
                 self.current_part, "measure", number=str(self.bar_nr))
         self.bar_nr +=1
+        # the shared words-direction belongs to ONE measure; without this reset
+        # add_dirwords could attach words to a direction from an earlier bar
+        # (or crash when another builder's local direction sat in this bar)
+        self.direction = None
         if bar_attrs:
             self.new_bar_attr(**bar_attrs)
 
@@ -310,6 +315,10 @@ class CreateMusicXML():
         self.current_artic = None
         self.current_ornament = None
         self.current_tech = None
+        # mult compounds NESTED tuplet factors within ONE note; it must never
+        # leak to the next note. Resetting only in add_div_duration let grace
+        # notes (which have no duration) carry the previous note's factor.
+        self.mult = 1
 
     def add_pitch(self, step, alter, octave):
         """Create new pitch."""
@@ -371,6 +380,17 @@ class CreateMusicXML():
         dura_node = etree.SubElement(skip, "duration")
         dura_node.text = str(duration)
 
+    def add_hidden_rest(self, duration, voice):
+        """An invisible placeholder rest (a LilyPond spacer): occupies time,
+        prints nothing. Encoded the way MuseScore exports hidden rests
+        (print-object="no") — a trailing <forward> gap instead leaves the
+        measure short in readers that derive length from content."""
+        self.current_note = etree.SubElement(
+            self.current_bar, "note", {"print-object": "no"})
+        self.add_rest()
+        self.add_div_duration(duration)
+        self.add_voice(voice)
+
     def add_div_duration(self, divdur):
         """Create new duration """
         self.duration = etree.SubElement(self.current_note, "duration")
@@ -379,7 +399,14 @@ class CreateMusicXML():
 
     def change_div_duration(self, newdura):
         """Set new duration when tuplet """
-        self.duration.text = str(newdura)
+        # only THIS note's own duration: a grace note has none, and writing to
+        # the remembered self.duration rewrote the PREVIOUS note's duration
+        # (a grace inside a tuplet corrupted it to a fraction like 8/3)
+        dur = self.current_note.find("duration")
+        if dur is not None:
+            if newdura == int(newdura):
+                newdura = int(newdura)
+            dur.text = str(newdura)
 
     def add_duration_type(self, durtype):
         """Create new type """
@@ -664,9 +691,15 @@ class CreateMusicXML():
         dirtypenode = etree.SubElement(direction, "direction-type")
         dyn_node = etree.SubElement(dirtypenode, "octave-shift", oct_dict)
 
+    def add_pedal(self, pedal_type):
+        """Add a sustain pedal direction (type 'start' or 'stop')."""
+        direction = etree.SubElement(self.current_bar, "direction", placement='below')
+        dirtypenode = etree.SubElement(direction, "direction-type")
+        etree.SubElement(dirtypenode, "pedal", type=pedal_type)
+
     def add_dirwords(self, words):
         """Add words in direction, e. g. a tempo mark."""
-        if self.current_bar.find('direction') is None:
+        if self.direction is None:
             self.add_direction()
         dirtypenode = etree.SubElement(self.direction, "direction-type")
         wordsnode = etree.SubElement(dirtypenode, "words")

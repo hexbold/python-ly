@@ -307,6 +307,8 @@ class IterateXmlObjs():
                 self.musxml.add_dynamic_text(d.sign)
             elif isinstance(d, DynamicsDashes):
                 self.musxml.add_dynamic_dashes(d.sign)
+            elif isinstance(d, Pedal):
+                self.musxml.add_pedal(d.sign)
 
     def gener_xml_mus(self, obj):
         """Nodes generic for both notes and rests."""
@@ -314,7 +316,9 @@ class IterateXmlObjs():
             for t in obj.tuplet:
                 self.musxml.tuplet_note(t.fraction, obj.duration, t.ttype, t.nr,
                                         self.divisions, t.acttype, t.normtype)
-        if obj.staff and not obj.skip:
+        # skips used to be <forward> elements, which cannot carry <staff>;
+        # as hidden rests they are notes and keep their staff like any other
+        if obj.staff:
             self.musxml.add_staff(obj.staff)
         for nr, beam_type in getattr(obj, 'beams', []):
             self.musxml.add_beam(nr, beam_type)
@@ -362,7 +366,7 @@ class IterateXmlObjs():
         """Create rest specific xml-nodes."""
         divdur = self.count_duration(obj.duration, self.divisions)
         if obj.skip:
-            self.musxml.add_skip(divdur)
+            self.musxml.add_hidden_rest(divdur, obj.voice)
         else:
             self.musxml.new_rest(divdur, obj.type, obj.pos,
             obj.dot, obj.voice)
@@ -485,28 +489,38 @@ class ScoreSection():
             self.barlist += voice.barlist[bl_len:]
 
     def merge_lyrics(self, lyrics):
-        """Merge in lyrics in music section."""
+        """Merge in lyrics in music section.
+
+        Follows LilyPond's \\lyricsto melisma rule: a note continuing a slur
+        or a tie takes no syllable of its own (the __ extender is a drawing
+        instruction on the previous syllable, not what causes the skip), a
+        chord takes ONE syllable on its base note, and grace notes take none.
+        """
         i = 0
-        ext = False
+        in_slur = False
         for bar in self.barlist:
             for obj in bar.obj_list:
-                if isinstance(obj, BarNote):
-                    if ext:
-                        if obj.slur:
-                            ext = False
-                    else:
-                        try:
-                            l = lyrics.barlist[i]
-                        except IndexError:
-                            break
-                        if l != 'skip':
-                            try:
-                                if l[3] == "extend" and obj.slur:
-                                    ext = True
-                            except IndexError:
-                                pass
-                            obj.add_lyric(l)
-                        i += 1
+                if not isinstance(obj, BarNote):
+                    continue
+                if obj.chord or obj.grace[0]:
+                    continue
+                starts = any(s.slurtype == 'start' for s in obj.slur)
+                stops = any(s.slurtype == 'stop' for s in obj.slur)
+                if in_slur:
+                    if stops:
+                        in_slur = False
+                    continue
+                if 'stop' in obj.tie:
+                    continue
+                if starts and not stops:
+                    in_slur = True
+                try:
+                    l = lyrics.barlist[i]
+                except IndexError:
+                    break
+                if l != 'skip':
+                    obj.add_lyric(l)
+                i += 1
 
 
 class Snippet(ScoreSection):
@@ -656,7 +670,11 @@ class Bar():
 
     def is_skip(self, obj_list=None):
         """ Check if bar has nothing but skips. """
-        if not obj_list:
+        if obj_list is None:
+            # an explicitly passed EMPTY list is skip-only by definition —
+            # `if not obj_list` made it fall through to self.obj_list, which
+            # planted a spurious measure-end <backup> in every part whose
+            # merged-in glob bar held nothing beyond its leading attribute
             obj_list = self.obj_list
         for obj in obj_list:
             if isinstance(obj, BarBackup):
@@ -773,6 +791,9 @@ class BarMus():
     def set_dynamics_dashes(self, sign, before=True):
         self.dynamic.append(DynamicsDashes(sign, before))
 
+    def set_pedal(self, sign, before=True):
+        self.dynamic.append(Pedal(sign, before))
+
     def set_oct_shift(self, plac, octdir, size):
         self.oct_shift = OctaveShift(plac, octdir, size)
 
@@ -817,6 +838,15 @@ class DynamicsText(Dynamics):
 
 class DynamicsDashes(Dynamics):
     """Dynamics dashes."""
+    pass
+
+
+class Pedal(Dynamics):
+    """A piano sustain pedal mark; sign is 'start' or 'stop'.
+
+    Not a dynamic, but it rides the same note-attached direction mechanism
+    so it lands at the note's position (before_note), like a dynamic mark.
+    """
     pass
 
 

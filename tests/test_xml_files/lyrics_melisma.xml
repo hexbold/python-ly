@@ -29,46 +29,83 @@
       <note>
         <pitch>
           <step>C</step>
-          <octave>5</octave>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
         <type>quarter</type>
+        <notations>
+          <slur number="1" type="start" />
+        </notations>
+        <lyric number="1">
+          <syllabic>single</syllabic>
+          <text>one</text>
+        </lyric>
       </note>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>D</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
         <type>quarter</type>
+        <notations>
+          <slur number="1" type="stop" />
+        </notations>
       </note>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>E</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
+        <tie type="start" />
         <voice>1</voice>
         <type>quarter</type>
+        <notations>
+          <tied type="start" />
+        </notations>
+        <lyric number="1">
+          <syllabic>single</syllabic>
+          <text>two</text>
+        </lyric>
       </note>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>E</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
+        <tie type="stop" />
         <voice>1</voice>
         <type>quarter</type>
+        <notations>
+          <tied type="stop" />
+        </notations>
       </note>
     </measure>
     <measure number="2">
-      <print new-system="yes" />
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <type>half</type>
+        <notations>
+          <slur number="1" type="start" />
+        </notations>
+        <lyric number="1">
+          <syllabic>single</syllabic>
+          <text>three</text>
+        </lyric>
+      </note>
+      <note>
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
@@ -76,30 +113,15 @@
       </note>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>B</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
         <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>1</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>1</duration>
-        <voice>1</voice>
-        <type>quarter</type>
+        <notations>
+          <slur number="1" type="stop" />
+        </notations>
       </note>
     </measure>
   </part>

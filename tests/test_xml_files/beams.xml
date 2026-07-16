@@ -5,7 +5,7 @@
   <identification>
     <encoding>
       <software>python-ly 0.9.10</software>
-      <encoding-date>2026-07-15</encoding-date>
+      <encoding-date>2026-07-16</encoding-date>
     </encoding>
   </identification>
   <part-list>
@@ -106,9 +106,6 @@
         <type>eighth</type>
         <beam number="1">end</beam>
       </note>
-      <backup>
-        <duration>32</duration>
-      </backup>
     </measure>
     <measure number="2">
       <note>

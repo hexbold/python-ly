@@ -17,6 +17,10 @@
     <measure number="1">
       <attributes>
         <divisions>1</divisions>
+        <key>
+          <fifths>2</fifths>
+          <mode>major</mode>
+        </key>
         <time symbol="common">
           <beats>4</beats>
           <beat-type>4</beat-type>
@@ -28,8 +32,8 @@
       </attributes>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>D</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
@@ -37,8 +41,9 @@
       </note>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
@@ -46,8 +51,8 @@
       </note>
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>A</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
@@ -55,7 +60,7 @@
       </note>
       <note>
         <pitch>
-          <step>C</step>
+          <step>D</step>
           <octave>5</octave>
         </pitch>
         <duration>1</duration>
@@ -64,11 +69,29 @@
       </note>
     </measure>
     <measure number="2">
-      <print new-system="yes" />
       <note>
         <pitch>
           <step>C</step>
-          <octave>5</octave>
+          <octave>4</octave>
+        </pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+        <accidental>natural</accidental>
+      </note>
+      <note>
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
         </pitch>
         <duration>1</duration>
         <voice>1</voice>
@@ -82,24 +105,7 @@
         <duration>1</duration>
         <voice>1</voice>
         <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>1</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>1</duration>
-        <voice>1</voice>
-        <type>quarter</type>
+        <accidental>natural</accidental>
       </note>
     </measure>
   </part>

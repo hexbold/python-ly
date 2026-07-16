@@ -5,7 +5,7 @@
   <identification>
     <encoding>
       <software>python-ly 0.9.10</software>
-      <encoding-date>2026-07-15</encoding-date>
+      <encoding-date>2026-07-16</encoding-date>
     </encoding>
   </identification>
   <part-list>
@@ -99,9 +99,6 @@
           </ornaments>
         </notations>
       </note>
-      <backup>
-        <duration>48</duration>
-      </backup>
     </measure>
   </part>
 </score-partwise>

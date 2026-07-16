@@ -33,6 +33,7 @@ from fractions import Fraction
 
 import ly.document
 import ly.music
+from ly.pitch.transpose import Transposer
 
 from . import create_musicxml
 from . import ly2xml_mediator
@@ -126,6 +127,7 @@ class ParseSource():
         self.unset_tuplspan = False
         self.alt_mode = None
         self.rel_pitch_isset = False
+        self.transpose_pitches = []
         self.slurcount = 0
         self.slurnr = 0
         self.phrslurnr = 0
@@ -329,7 +331,18 @@ class ParseSource():
         self.mediator.new_clef(clef.specifier())
 
     def KeySignature(self, key):
-        self.mediator.new_key(key.pitch().output(), key.mode())
+        p = key.pitch()
+        if self.mediator.transposers:
+            p = p.copy()
+            for t in reversed(self.mediator.transposers):
+                t.transpose(p)
+        self.mediator.new_key(p.output(), key.mode())
+
+    def Transpose(self, transpose):
+        r"""A \transpose FROM TO music expression. The two duration-less pitch
+        children arrive through Note() (which pushes the Transposer); the End
+        event pops it. Explicit handler so the dispatcher warning stays quiet."""
+        pass
 
     def Relative(self, relative):
         r"""A \relative music expression."""
@@ -359,7 +372,14 @@ class ParseSource():
                                        tupl_factor=self.tuplet_factor())
             self.check_note(note)
         else:
-            if isinstance(note.parent(), ly.music.items.Relative):
+            if isinstance(note.parent(), ly.music.items.Transpose):
+                # the two duration-less pitches of \transpose FROM TO { music }
+                self.transpose_pitches.append(note.pitch)
+                if len(self.transpose_pitches) == 2:
+                    self.mediator.transposers.append(
+                        Transposer(self.transpose_pitches[0], self.transpose_pitches[1]))
+                    self.transpose_pitches = []
+            elif isinstance(note.parent(), ly.music.items.Relative):
                 self.mediator.set_relative(note)
                 self.rel_pitch_isset = True
             elif isinstance(note.parent(), ly.music.items.Chord):
@@ -623,6 +643,10 @@ class ParseSource():
             self.mediator.new_navigation('segno')
         elif command.token == '\\codaMark':
             self.mediator.new_navigation('coda')
+        elif command.token == '\\sustainOn':
+            self.mediator.new_pedal('start')
+        elif command.token == '\\sustainOff':
+            self.mediator.new_pedal('stop')
         elif command.token == '\\breathe':
             art = type('',(object,),{"token": "\\breathe"})()
             self.Articulation(art)
@@ -652,17 +676,36 @@ class ParseSource():
             self.tupl_span = True
 
     def Markup(self, markup):
-        r"""A \markup. The only one handled here is the classic way of writing a navigation
-        sign, \mark \markup { \musicglyph "scripts.segno" }, which is a segno and not the
-        rehearsal letter \mark alone would make of it."""
+        r"""A \markup. Two cases are handled: the classic way of writing a navigation
+        sign, \mark \markup { \musicglyph "scripts.segno" } (a segno, not the rehearsal
+        letter \mark alone would make of it), and a note-attached markup like
+        c'4^\markup { \italic "dolce" }, whose text flattens to a <words> direction at
+        the note's position — same as plain ^"dolce". Formatting is dropped, text kept."""
         if self.mark:
             self.mark = False
             nav = NAVIGATION_GLYPHS.get(musicglyph_name(markup))
             if nav:
                 self.mediator.mark_as_navigation(nav)
+        elif isinstance(markup.parent(), ly.music.items.Postfix):
+            text = markup.plaintext().strip()
+            if text:
+                self.mediator.new_note_word(text)
 
     def MarkupWord(self, markupWord):
+        # words of a note-attached markup were already consumed whole by the
+        # Markup handler above; only free-standing markup words go to the bar
+        node = markupWord.parent()
+        while node:
+            if isinstance(node, ly.music.items.Postfix):
+                return
+            node = node.parent()
         self.mediator.new_word(markupWord.token)
+
+    def MarkupCommand(self, markupcommand):
+        r"""A markup command like \italic or \bold: formatting only, the words
+        inside arrive as MarkupWord/String nodes. Explicit no-op so the
+        dispatcher's not-implemented warning cannot mask real errors here."""
+        pass
 
     def MarkupList(self, markuplist):
         pass
@@ -745,7 +788,10 @@ class ParseSource():
         pass
 
     def End(self, end):
-        if isinstance(end.node, ly.music.items.Scaler):
+        if isinstance(end.node, ly.music.items.Transpose):
+            if self.mediator.transposers:
+                self.mediator.transposers.pop()
+        elif isinstance(end.node, ly.music.items.Scaler):
             if self.unset_tuplspan:
                 self.mediator.unset_tuplspan_dur()
                 self.unset_tuplspan = False

@@ -5,7 +5,7 @@
   <identification>
     <encoding>
       <software>python-ly 0.9.10</software>
-      <encoding-date>2026-07-14</encoding-date>
+      <encoding-date>2026-07-16</encoding-date>
     </encoding>
   </identification>
   <part-list>
@@ -26,6 +26,14 @@
           <line>2</line>
         </clef>
       </attributes>
+      <direction placement="above">
+        <direction-type>
+          <words>pizz.</words>
+        </direction-type>
+        <direction-type>
+          <words>dolce</words>
+        </direction-type>
+      </direction>
       <note>
         <pitch>
           <step>C</step>
@@ -35,14 +43,6 @@
         <voice>1</voice>
         <type>quarter</type>
       </note>
-      <direction placement="above">
-        <direction-type>
-          <words>pizz.</words>
-        </direction-type>
-        <direction-type>
-          <words>dolce</words>
-        </direction-type>
-      </direction>
       <note>
         <pitch>
           <step>D</step>

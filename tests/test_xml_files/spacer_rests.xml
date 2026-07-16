@@ -26,46 +26,53 @@
           <line>2</line>
         </clef>
       </attributes>
-      <direction placement="above">
-        <direction-type>
-          <words>intenso</words>
-        </direction-type>
-      </direction>
       <note>
         <pitch>
-          <step>A</step>
+          <step>C</step>
           <octave>4</octave>
         </pitch>
-        <duration>4</duration>
+        <duration>1</duration>
         <voice>1</voice>
-        <type>whole</type>
+        <type>quarter</type>
+      </note>
+      <note print-object="no">
+        <rest />
+        <duration>1</duration>
+        <voice>1</voice>
+      </note>
+      <note>
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>1</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note print-object="no">
+        <rest />
+        <duration>1</duration>
+        <voice>1</voice>
       </note>
     </measure>
     <measure number="2">
-      <direction placement="above">
-        <direction-type>
-          <words>intenso</words>
-        </direction-type>
-      </direction>
+      <note print-object="no">
+        <rest />
+        <duration>1</duration>
+        <voice>1</voice>
+      </note>
       <note>
         <pitch>
-          <step>A</step>
+          <step>F</step>
           <octave>4</octave>
         </pitch>
-        <duration>4</duration>
+        <duration>1</duration>
         <voice>1</voice>
-        <type>whole</type>
+        <type>quarter</type>
       </note>
-    </measure>
-    <measure number="3">
-      <direction placement="above">
-        <direction-type>
-          <words>poco più forte</words>
-        </direction-type>
-      </direction>
       <note>
         <pitch>
-          <step>A</step>
+          <step>G</step>
           <octave>4</octave>
         </pitch>
         <duration>2</duration>

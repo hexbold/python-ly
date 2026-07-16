@@ -63,6 +63,53 @@ def test_lyrics_sibling():
     compare_output('lyrics_sibling')
 
 
+def test_lyrics_verses():
+    # Two \lyricsto contexts onto one voice are verses 1 and 2; their lyrics
+    # must be numbered so consumers can stack them.
+    compare_output('lyrics_verses')
+
+
+def test_pedal():
+    # \sustainOn/\sustainOff become <pedal type="start"/"stop"> directions.
+    compare_output('pedal')
+
+
+def test_markup_note():
+    # Note-attached markup flattens to its plaintext as a <words> direction,
+    # like a plain quoted string does.
+    compare_output('markup_note')
+
+
+def test_transpose():
+    # \transpose emits the SOUNDING pitches (and transposes an inner \key);
+    # music after the block returns to written pitch.
+    compare_output('transpose')
+
+
+def test_chord_repetition():
+    # q with a new duration must feed the divisions computation: the eighth
+    # copies used to get XSD-invalid <duration>0</duration>.
+    compare_output('chord_repetition')
+
+
+def test_spacer_rests():
+    # s and \skip become invisible rests (print-object="no"), and a measure
+    # ending in a spacer gets no spurious <backup>.
+    compare_output('spacer_rests')
+
+
+def test_tuplet_grace():
+    # A grace inside a tuplet must not corrupt the previous note's <duration>
+    # through the remembered duration node, nor leak the tuplet factor.
+    compare_output('tuplet_grace')
+
+
+def test_lyrics_melisma():
+    # \lyricsto skips slur and tie continuations (LilyPond's melisma rule),
+    # not only notes behind a __ extender.
+    compare_output('lyrics_melisma')
+
+
 def test_header_tagline():
     # Empty header values (tagline = ##f) must be skipped, and identification
     # children must keep call order (creator before rights, before encoding).
@@ -155,8 +202,9 @@ def test_church():
     compare_output('church_modes')
 
 
-@pytest.mark.xfail
 def test_markup():
+    # was xfail for years: note-attached markup words used to land in the
+    # wrong measure (or vanish, for quoted/formatted markup)
     compare_output('markup')
 
 

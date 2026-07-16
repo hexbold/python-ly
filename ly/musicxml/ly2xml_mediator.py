@@ -74,6 +74,9 @@ class Mediator():
         self.lyric = None
         self.lyric_syll = False
         self.lyric_nr = 1
+        self.lyric_verse_counts = {}
+        self.transposers = []
+        self.current_note_bar = None
         self.ongoing_wedge = False
         self.ongoing_dashes = False
         self.octdiff = 0
@@ -125,11 +128,26 @@ class Mediator():
         self.sections.append(snippet)
         self.bar = None
 
+    def sounding_pitch(self, note):
+        """The note's sounding pitch: a copy with any active \\transpose applied.
+
+        Transposers stack for nested \\transpose; the innermost applies first.
+        """
+        p = note.pitch.copy()
+        for t in reversed(self.transposers):
+            t.transpose(p)
+        return p
+
     def new_lyric_section(self, name, voice_id):
         name = self.check_name(name)
         lyrics = xml_objs.LyricsSection(name, voice_id)
         self.insert_into = lyrics
         self.lyric_sections[name] = lyrics
+        # Number verses per voice: the Nth \lyricsto onto the same voice is
+        # verse N (lyric number="N" in MusicXML). \set stanza still overrides
+        # afterwards through new_lyric_nr.
+        self.lyric_verse_counts[voice_id] = self.lyric_verse_counts.get(voice_id, 0) + 1
+        self.lyric_nr = self.lyric_verse_counts[voice_id]
 
     def check_name(self, name, nr=1):
         n = self.get_var_byname(name)
@@ -537,13 +555,21 @@ class Mediator():
             self.add_to_bar(new_bar_attr)
 
     def new_note_word(self, word):
-        # a note-attached text gets its own direction at the note's position,
-        # not merged into the bar's attributes like joined markup words
-        if self.bar is None:
-            self.new_bar()
+        # a note-attached text gets its own direction AT the note's position:
+        # insert before the note in the note's own bar. Appending to self.bar
+        # put the words one measure late whenever the note filled its measure
+        # (self.bar had already advanced).
         new_bar_attr = xml_objs.BarAttr()
         new_bar_attr.set_word(word)
-        self.add_to_bar(new_bar_attr)
+        bar = getattr(self, 'current_note_bar', None) or self.bar
+        if bar is None:
+            self.new_bar()
+            bar = self.bar
+        try:
+            idx = bar.obj_list.index(self.current_note)
+        except ValueError:
+            idx = len(bar.obj_list)
+        bar.obj_list.insert(idx, new_bar_attr)
 
     def new_time(self, num, den, numeric=False):
         self.current_time = Fraction(num, den.denominator)
@@ -621,8 +647,9 @@ class Mediator():
 
     def create_barnote_from_note(self, note):
         """Create a xml_objs.BarNote from ly.music.items.Note."""
-        p = getNoteName(note.pitch.note)
-        alt = get_xml_alter(note.pitch.alter)
+        pitch = self.sounding_pitch(note)
+        p = getNoteName(pitch.note)
+        alt = get_xml_alter(pitch.alter)
         try:
             acc = note.accidental_token
         except AttributeError:
@@ -666,6 +693,9 @@ class Mediator():
                 else:
                     self.staff_unset_notes[self.staff] = [self.current_note]
         self.add_to_bar(self.current_note)
+        # postfix material (a ^"text" arriving after the note) must reach THIS
+        # bar even when the note filled its measure and self.bar moved on
+        self.current_note_bar = self.bar
 
     def stem_direction(self, direction):
         if direction == '\\stemUp':
@@ -677,7 +707,7 @@ class Mediator():
 
     def set_octave(self, relative):
         """Set octave by getting the octave of an absolute note + 3."""
-        p = self.current_lynote.pitch.copy()
+        p = self.sounding_pitch(self.current_lynote)
         if relative:
             p.makeAbsolute(self.prev_pitch)
         self.prev_pitch = p
@@ -735,7 +765,7 @@ class Mediator():
         chord_note.tuplet = self.current_note.tuplet
         if not self.prev_chord_pitch:
             self.prev_chord_pitch = self.prev_pitch
-        p = note.pitch.copy()
+        p = self.sounding_pitch(note)
         if(rel):
             p.makeAbsolute(self.prev_chord_pitch)
         chord_note.set_octave(p.octave + 3)
@@ -763,6 +793,9 @@ class Mediator():
                 cn.set_tie('stop')
             self.bar.add(cn)
         self.tied = False
+        # A q with a NEW duration (q8 after a quarter chord) must feed the
+        # divisions computation like any note, or the copies get duration 0.
+        self.check_divs()
         if not is_grace:  # FIX: grace chords occupy no real time in the bar
             self.increase_bar_dura(duration, tupl_factor)  # FIX: count repeated chord duration for bar boundaries
 
@@ -916,6 +949,10 @@ class Mediator():
                 self.current_note.add_other_notation(art_token[1:])
             elif ret:
                 self.current_note.add_articulation(ret)
+
+    def new_pedal(self, ptype):
+        """Piano sustain pedal: \\sustainOn = start, \\sustainOff = stop."""
+        self.current_note.set_pedal(ptype)
 
     def new_dynamics(self, dynamics):
         hairpins = {'<': 'crescendo', '>': 'diminuendo'}
