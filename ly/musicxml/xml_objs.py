@@ -62,12 +62,18 @@ class IterateXmlObjs():
     is constructed.
 
     """
-    def __init__(self, score, musxml, div):
+    def __init__(self, score, musxml, div, collector=None):
         """Create the basic score information, and initiate the
-        iteration of the parts."""
+        iteration of the parts.
+
+        collector, when given, is a srcmap.SrcMapCollector that records the
+        source span of every emitted object (see ly.musicxml.srcmap).
+
+        """
         # score.debug_score([])
         self.musxml = musxml
         self.divisions = div
+        self.collector = collector
         if score.title:
             self.musxml.create_title(score.title)
         for ctag in score.creators:
@@ -106,6 +112,8 @@ class IterateXmlObjs():
             last_bar_objs = last_bar.obj_list
             part.set_first_bar(self.divisions)
             self.musxml.create_part(part.name, part.abbr, part.midi)
+            if self.collector:
+                self.collector.start_part(part.name, part.staves)
             for bar in part.barlist[:-1]:
                 self.iterate_bar(bar)
             # A leftover trailing bar may hold SEVERAL empty BarAttrs (one per
@@ -124,15 +132,23 @@ class IterateXmlObjs():
         self.set_accidentals(events)
         self.set_beams(events)
         self.musxml.create_measure(pickup = bar.pickup)
+        if self.collector:
+            self.collector.start_measure(bar.pickup)
         for obj in bar.obj_list:
             if isinstance(obj, BarAttr):
                 self.new_xml_bar_attr(obj)
+                if self.collector:
+                    self.collector.bar_attr(obj)
             elif isinstance(obj, BarMus):
                 self.before_note(obj)
                 if isinstance(obj, BarNote):
                     self.new_xml_note(obj)
+                    if self.collector:
+                        self.collector.note(obj)
                 elif isinstance(obj, BarRest):
                     self.new_xml_rest(obj)
+                    if self.collector:
+                        self.collector.rest(obj)
                 self.gener_xml_mus(obj)
                 self.after_note(obj)
             elif isinstance(obj, BarBackup):
@@ -388,6 +404,8 @@ class Score():
         self.info = {}
         self.rights = []
         self.glob_section = ScoreSection('global', True)
+        # source-map provenance (ly.musicxml.srcmap): header field -> span
+        self.src_header = {}
 
     def add_right(self, value, type):
         self.rights.append((value, type))
@@ -608,6 +626,8 @@ class ScorePart(ScoreSection):
                     glob_barattr.barline = obj.barline
                     glob_barattr.repeat = obj.repeat
                     glob_barattr.tempo = obj.tempo
+                    glob_barattr.src_key = obj.src_key
+                    glob_barattr.src_time = obj.src_time
                     section_bar.obj_list.append(glob_barattr)
             section.barlist.append(section_bar)
         return section
@@ -763,6 +783,13 @@ class BarMus():
         self.other_notation = None
         self.dynamic = []
         self.oct_shift = None
+        # source-map provenance (ly.musicxml.srcmap): the source span this
+        # object was created from, its written duration's span, and spans of
+        # note-attached tokens. None/empty for objects the exporter created
+        # without their own source token (q repeats, R1*n copies, …).
+        self.src = None
+        self.src_dur = None
+        self.src_attach = []
 
     def __repr__(self):
         return '<{0} {1}>'.format(self.__class__.__name__, self.duration)
@@ -1012,6 +1039,10 @@ class BarAttr():
         self.navigation = None
         self.word = None
         self.new_system = None
+        # source-map provenance (ly.musicxml.srcmap)
+        self.src_key = None
+        self.src_time = None
+        self.src_clef = None
 
     def __repr__(self):
         return '<{0} {1}>'.format(self.__class__.__name__, self.time)
@@ -1082,10 +1113,13 @@ class BarAttr():
         if barattr.key is not None and (override or self.key is None):
             self.key = barattr.key
             self.mode = barattr.mode
+            self.src_key = barattr.src_key
         if barattr.time != 0 and (override or self.time == 0):
             self.time = barattr.time
+            self.src_time = barattr.src_time
         if barattr.clef != 0 and (override or self.clef == 0):
             self.clef = barattr.clef
+            self.src_clef = barattr.src_clef
         if barattr.multiclef:
             self.multiclef += barattr.multiclef
         if barattr.tempo is not None and (override or self.tempo is None):
@@ -1101,6 +1135,8 @@ class BarBackup():
 class TempoDir():
     """ Object that stores tempo direction information """
     def __init__(self, unit, unittype, beats, dots, text):
+        # source-map provenance (ly.musicxml.srcmap)
+        self.src = None
         # beats is a list of bpm endpoints: [96] or a range [60, 72].
         if unittype and beats and beats[0]:
             per_minute = "-".join(str(b) for b in beats)

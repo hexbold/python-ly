@@ -29,9 +29,43 @@ from __future__ import division
 from fractions import Fraction
 
 import ly.duration
+import ly.music.items
 import ly.pitch
 
 from . import xml_objs
+
+
+def note_src_span(note):
+    """The pitch region of a note item in the parsed text: note name plus
+    octave marks (and a forced/cautionary accidental token, if any). None for
+    items without a real pitch token (isolated durations)."""
+    if isinstance(note, ly.music.items.Unpitched):
+        return None
+    tok = note.token
+    if tok is None or getattr(tok, 'pos', None) is None:
+        return None
+    end = tok.end
+    for t in (getattr(note, 'octave_token', None),
+              getattr(note, 'accidental_token', None),
+              getattr(note, 'octavecheck_token', None)):
+        if t is not None:
+            end = max(end, t.end)
+    return (tok.pos, end)
+
+
+def item_src_span(item):
+    """The full span of a source item (used for \\key, \\clef, \\tempo, …)."""
+    pos = getattr(item, 'position', -1)
+    if pos is None or pos < 0:
+        return None
+    return (pos, item.end_position())
+
+
+def token_src_span(token):
+    """The span of a single token, or None if it carries no position."""
+    if token is None or getattr(token, 'pos', None) is None:
+        return None
+    return (token.pos, token.end)
 
 
 class Mediator():
@@ -92,12 +126,14 @@ class Mediator():
         self.bar_is_pickup = False
         self.stem_dir = None
 
-    def new_header_assignment(self, name, value):
+    def new_header_assignment(self, name, value, src=None):
         """Distributing header information."""
         if not value:
             # Scheme values stringify to '' (e.g. the ubiquitous tagline = ##f);
             # emitting them made empty elements like <rights/>.
             return
+        if src:
+            self.score.src_header[name] = src
         creators = ['composer', 'arranger', 'poet', 'lyricist']
         if name == 'title':
             self.score.title = value
@@ -486,15 +522,17 @@ class Mediator():
                 target = self.bar
             target.add(barattr)
 
-    def new_key(self, key_name, mode):
+    def new_key(self, key_name, mode, src=None):
         if self.bar is None:
             self.new_bar()
         if self.bar.has_music():
             new_bar_attr = xml_objs.BarAttr()
             new_bar_attr.set_key(get_fifths(key_name, mode), mode)
+            new_bar_attr.src_key = src
             self.add_to_bar(new_bar_attr)
         else:
             self.current_attr.set_key(get_fifths(key_name, mode), mode)
+            self.current_attr.src_key = src
 
     def bijective(self, n):
         '''encodes an int to a sequence of letters'''
@@ -571,25 +609,28 @@ class Mediator():
             idx = len(bar.obj_list)
         bar.obj_list.insert(idx, new_bar_attr)
 
-    def new_time(self, num, den, numeric=False):
+    def new_time(self, num, den, numeric=False, src=None):
         self.current_time = Fraction(num, den.denominator)
         if self.bar is None:
             self.new_bar()
         self.current_attr.set_time([num, den.denominator], numeric)
+        self.current_attr.src_time = src
 
-    def new_clef(self, clefname):
+    def new_clef(self, clefname, src=None):
         self.clef = clefname2clef(clefname)
         if self.bar is None:
             self.new_bar()
         if self.bar.has_music():
             new_bar_attr = xml_objs.BarAttr()
             new_bar_attr.set_clef(self.clef)
+            new_bar_attr.src_clef = src
             self.add_to_bar(new_bar_attr)
         else:
             if self.staff:
-                self.current_attr.multiclef.append((self.clef, self.staff))
+                self.current_attr.multiclef.append((self.clef, self.staff, src))
             else:
                 self.current_attr.set_clef(self.clef)
+                self.current_attr.src_clef = src
 
     def set_relative(self, note):
         self.prev_pitch = note.pitch
@@ -655,7 +696,13 @@ class Mediator():
         except AttributeError:
             acc = ""
         dura = note.duration
-        return xml_objs.BarNote(p, alt, acc, dura, self.voice)
+        barnote = xml_objs.BarNote(p, alt, acc, dura, self.voice)
+        barnote.src = note_src_span(note)
+        # under \transpose the emitted pitch is the SOUNDING one while the source
+        # token is WRITTEN — mark it so map consumers don't edit written text
+        # against sounding expectations
+        barnote.src_transposed = bool(self.transposers)
+        return barnote
 
     def copy_barnote_basics(self, bar_note):
         """Create a copy of a xml_objs.BarNote."""
@@ -672,6 +719,9 @@ class Mediator():
     def new_duration_token(self, token, tokens):
         self.dur_token = token
         self.dur_tokens = tokens
+        if self.current_note is not None and getattr(token, 'pos', None) is not None:
+            end = tokens[-1].end if tokens else token.end
+            self.current_note.src_dur = (token.pos, end)
         self.check_duration(self.current_is_rest)
 
     def check_current_note(self, rel=False, rest=False, is_unpitched=False):
@@ -821,6 +871,7 @@ class Mediator():
                 self.set_mult_rest_bar(dur)
         elif rtype == 's' or rtype == '\\skip':
             self.current_note = xml_objs.BarRest(dur, self.voice, skip=True)
+        self.current_note.src = token_src_span(rest.token)
         self.check_current_note(rest=True)
         self.increase_bar_dura(dur, tupl_factor)
 
@@ -829,7 +880,9 @@ class Mediator():
         dur = self.current_note.duration
         voice = self.current_note.voice
         pos = [self.current_note.base_note, self.current_note.octave]
+        src = self.current_note.src
         self.current_note = xml_objs.BarRest(dur, voice, pos=pos)
+        self.current_note.src = src
         self.check_duration(rest=True)
         self.bar.obj_list.pop()
         self.bar.add(self.current_note)
@@ -904,12 +957,13 @@ class Mediator():
         fraction and duration of tuplet."""
         return tfraction[1] / length
 
-    def tie_to_next(self):
+    def tie_to_next(self, src=None):
         tie_type = 'start'
         self.tied = True
         self.current_note.set_tie(tie_type)
+        self._record_attach('tie', '~', src)
 
-    def set_slur(self, nr, slur_type, phrasing=False):
+    def set_slur(self, nr, slur_type, phrasing=False, src=None):
         """
         Set the slur start or stop for the current note.
         phrasing should be set to True if the slur is meant to be a phrasing mark.
@@ -921,6 +975,7 @@ class Mediator():
             slur_start = self.slur_stack.pop()
 
         self.current_note.set_slur(nr, slur_type, phrasing, slur_start)
+        self._record_attach('slur', slur_type, src)
 
         if slur_type == 'start':
             self.slur_stack.append(self.current_note.slur[-1])
@@ -941,20 +996,31 @@ class Mediator():
         """
         if isinstance(art_token, ly.lex.lilypond.Fingering):
             self.current_note.add_fingering(art_token)
+            self._record_attach('fingering', str(art_token), token_src_span(art_token))
         else:
             ret = artic_token2xml_name(art_token)
             if ret == 'ornament':
                 self.current_note.add_ornament(art_token[1:])
+                self._record_attach('ornament', art_token[1:], token_src_span(art_token))
             elif ret == 'other':
                 self.current_note.add_other_notation(art_token[1:])
+                self._record_attach('other', art_token[1:], token_src_span(art_token))
             elif ret:
                 self.current_note.add_articulation(ret)
+                self._record_attach('artic', ret, token_src_span(art_token))
 
-    def new_pedal(self, ptype):
+    def _record_attach(self, kind, name, src):
+        """Record a note-attached token's source span on the current note
+        (source-map provenance, see ly.musicxml.srcmap)."""
+        if src and self.current_note is not None:
+            self.current_note.src_attach.append((kind, name, src[0], src[1]))
+
+    def new_pedal(self, ptype, src=None):
         """Piano sustain pedal: \\sustainOn = start, \\sustainOff = stop."""
         self.current_note.set_pedal(ptype)
+        self._record_attach('pedal', ptype, src)
 
-    def new_dynamics(self, dynamics):
+    def new_dynamics(self, dynamics, src=None):
         hairpins = {'<': 'crescendo', '>': 'diminuendo'}
         text_dyn = {'cresc': 'cresc.', 'decresc': 'descresc.',
                     'dim': 'dim.'}
@@ -965,23 +1031,29 @@ class Mediator():
             if self.ongoing_dashes:
                 self.current_note.set_dynamics_dashes('stop')
                 self.ongoing_dashes = False
+            self._record_attach('wedge', 'stop', src)
         elif dynamics in hairpins:
             self.current_note.set_dynamics_wedge(hairpins[dynamics])
             self.ongoing_wedge = True
+            self._record_attach('wedge', hairpins[dynamics], src)
         elif dynamics in text_dyn:
             self.current_note.set_dynamics_text(text_dyn[dynamics])
             self.current_note.set_dynamics_dashes('start', before=False)
             self.ongoing_dashes = True
+            self._record_attach('wedge', dynamics, src)
         elif self.ongoing_wedge:
             self.current_note.set_dynamics_wedge('stop')
             self.current_note.set_dynamics_mark(dynamics)
             self.ongoing_wedge = False
+            self._record_attach('dyn', dynamics, src)
         elif self.ongoing_dashes:
             self.current_note.set_dynamics_dashes('stop')
             self.current_note.set_dynamics_mark(dynamics)
             self.ongoing_dashes = False
+            self._record_attach('dyn', dynamics, src)
         else:
             self.current_note.set_dynamics_mark(dynamics)
+            self._record_attach('dyn', dynamics, src)
 
     def new_grace(self, slash=0):
         self.current_note.set_grace(slash)
@@ -1063,7 +1135,7 @@ class Mediator():
     def set_ottava(self, note, plac, octdir, size):
         note.set_oct_shift(plac, octdir, size)
 
-    def new_tempo(self, unit, dur_tokens, tempo, string):
+    def new_tempo(self, unit, dur_tokens, tempo, string, src=None):
         dots, rs = self.duration_from_tokens(dur_tokens)
         # tempo is a list of endpoints: [96] for a plain tempo, [60, 72] for a range
         beats = list(tempo) if tempo else []
@@ -1074,6 +1146,7 @@ class Mediator():
         tempo = xml_objs.BarAttr()
         unittype = durval2type(unit) if unit else ''
         tempo.set_tempo(unit, unittype, beats, dots, text)
+        tempo.tempo.src = src
         if self.bar is None:
             self.new_bar()
         self.bar.add(tempo)

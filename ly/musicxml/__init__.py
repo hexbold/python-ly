@@ -27,7 +27,7 @@ that you can use some of the submodules for generic MusicXML creation and manipu
 
 from __future__ import unicode_literals
 
-def writer():
+def writer(srcmap=False):
     """Convert LilyPond text to MusicXML
 
     Example::
@@ -39,9 +39,13 @@ def writer():
         xml.write(filename)         # or: xml.tostring()
         # xml.tree is the ElementTree xml tree.
 
+    With srcmap=True the writer also collects a source map — for every
+    emitted note/rest/directive the span in the parsed text it came from
+    (see ly.musicxml.srcmap). Read it with e.srcmap() after e.musicxml().
+
     """
 
     from . import lymus2musxml
-    return lymus2musxml.ParseSource()
+    return lymus2musxml.ParseSource(srcmap=srcmap)
 
 

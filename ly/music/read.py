@@ -752,6 +752,8 @@ class Reader(object):
             elif isinstance(t, lilypond.Fraction):
                 item._num, den = map(int, t.split('/'))
                 item._fraction = Fraction(1, den)
+                # keep the token so end_position() covers the whole \time 4/4
+                item._fraction_token = t
             else:
                 self.source.pushback()
             break

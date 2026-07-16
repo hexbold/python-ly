@@ -100,9 +100,14 @@ class End():
 class ParseSource():
     """ creates the XML-file from the source code according to the Music XML standard """
 
-    def __init__(self):
+    def __init__(self, srcmap=False):
+        """srcmap: also collect a source map (see ly.musicxml.srcmap) while
+        converting; read it with srcmap() after musicxml()."""
         self.musxml = create_musicxml.CreateMusicXML()
         self.mediator = ly2xml_mediator.Mediator()
+        self.collect_srcmap = srcmap
+        self._srcmap = None
+        self._src_identical = True
         self.relative = False
         self.tuplet = []
         self.scale = ''
@@ -159,6 +164,12 @@ class ParseSource():
         import ly.pitch.rel2abs
         cursor = ly.document.Cursor(doc)
         ly.pitch.rel2abs.rel2abs(cursor, first_pitch_absolute=relative_first_pitch_absolute)
+        # Source-map validity: token positions in the music tree index the
+        # CONVERTED copy. For absolute-pitch input rel2abs changes nothing and
+        # the spans index the caller's text directly; otherwise the map is
+        # flagged unusable for editing (srcmap "positions_valid": false).
+        if self.collect_srcmap:
+            self._src_identical = (doc.plaintext() == ly_doc.plaintext())
         mustree = ly.music.document(doc)
         self.parse_tree(mustree)
 
@@ -196,10 +207,25 @@ class ParseSource():
 
     def musicxml(self, prettyprint=True):
         self.mediator.check_score()
+        collector = None
+        if self.collect_srcmap:
+            from . import srcmap
+            collector = srcmap.SrcMapCollector(self.mediator.score)
         xml_objs.IterateXmlObjs(
-            self.mediator.score, self.musxml, self.mediator.divisions)
+            self.mediator.score, self.musxml, self.mediator.divisions,
+            collector=collector)
+        if collector is not None:
+            self._srcmap = collector.result(positions_valid=self._src_identical)
         xml = self.musxml.musicxml(prettyprint)
         return xml
+
+    def srcmap(self):
+        """The source map collected by musicxml(), or None.
+
+        Only filled when the writer was created with srcmap=True and
+        musicxml() has run. See ly.musicxml.srcmap for the format.
+        """
+        return self._srcmap
 
     ##
     # The different source types from ly.music are here sent to translation.
@@ -227,7 +253,8 @@ class ParseSource():
             else:
                 self.mediator.set_by_property(a.name(), val)
         else:
-            self.mediator.new_header_assignment(a.name(), val)
+            self.mediator.new_header_assignment(a.name(), val,
+                src=ly2xml_mediator.item_src_span(a.value()))
 
     def sim_is_container(self, musicList):
         """True if a ``<< >>`` directly holds staff/group/piano contexts.
@@ -328,7 +355,8 @@ class ParseSource():
 
     def Clef(self, clef):
         r""" Clef \clef"""
-        self.mediator.new_clef(clef.specifier())
+        self.mediator.new_clef(clef.specifier(),
+                               src=ly2xml_mediator.item_src_span(clef))
 
     def KeySignature(self, key):
         p = key.pitch()
@@ -336,7 +364,8 @@ class ParseSource():
             p = p.copy()
             for t in reversed(self.mediator.transposers):
                 t.transpose(p)
-        self.mediator.new_key(p.output(), key.mode())
+        self.mediator.new_key(p.output(), key.mode(),
+                              src=ly2xml_mediator.item_src_span(key))
 
     def Transpose(self, transpose):
         r"""A \transpose FROM TO music expression. The two duration-less pitch
@@ -474,14 +503,15 @@ class ParseSource():
 
     def Tempo(self, tempo):
         """ Tempo direction, e g '4 = 80' """
+        src = ly2xml_mediator.item_src_span(tempo)
         if self.look_ahead(tempo, ly.music.items.Duration):
-            self.tempo = (tempo.tempo(), tempo.text())
+            self.tempo = (tempo.tempo(), tempo.text(), src)
         else:
-            self.mediator.new_tempo(0, (), tempo.tempo(), tempo.text())
+            self.mediator.new_tempo(0, (), tempo.tempo(), tempo.text(), src)
 
     def Tie(self, tie):
         """ tie ~ """
-        self.mediator.tie_to_next()
+        self.mediator.tie_to_next(src=ly2xml_mediator.token_src_span(tie.token))
 
     def Rest(self, rest):
         r""" rest, r or R. Note: NOT by command, i.e. \rest """
@@ -536,27 +566,30 @@ class ParseSource():
 
     def Slur(self, slur):
         """ Slur, '(' = start, ')' = stop. """
+        src = ly2xml_mediator.token_src_span(slur.token)
         if slur.token == '(':
             self.slurcount += 1
             self.slurnr = self.slurcount
-            self.mediator.set_slur(self.slurnr, "start")
+            self.mediator.set_slur(self.slurnr, "start", src=src)
         elif slur.token == ')':
-            self.mediator.set_slur(self.slurnr, "stop")
+            self.mediator.set_slur(self.slurnr, "stop", src=src)
             self.slurcount -= 1
 
     def PhrasingSlur(self, phrslur):
         r"""A \( or \)."""
+        src = ly2xml_mediator.token_src_span(phrslur.token)
         if phrslur.token == r'\(':
             self.slurcount += 1
             self.phrslurnr = self.slurcount
-            self.mediator.set_slur(self.phrslurnr, "start", phrasing=True)
+            self.mediator.set_slur(self.phrslurnr, "start", phrasing=True, src=src)
         elif phrslur.token == r'\)':
-            self.mediator.set_slur(self.phrslurnr, "stop", phrasing=True)
+            self.mediator.set_slur(self.phrslurnr, "stop", phrasing=True, src=src)
             self.slurcount -= 1
 
     def Dynamic(self, dynamic):
         """Any dynamic symbol."""
-        self.mediator.new_dynamics(dynamic.token[1:])
+        self.mediator.new_dynamics(dynamic.token[1:],
+                                   src=ly2xml_mediator.token_src_span(dynamic.token))
 
     def Grace(self, grace):
         self.grace_seq = True
@@ -564,7 +597,8 @@ class ParseSource():
         self.grace_slash = 1 if grace.token in ('\\acciaccatura', '\\slashedGrace') else 0
 
     def TimeSignature(self, timeSign):
-        self.mediator.new_time(timeSign.numerator(), timeSign.fraction(), self.numericTime)
+        self.mediator.new_time(timeSign.numerator(), timeSign.fraction(), self.numericTime,
+                               src=ly2xml_mediator.item_src_span(timeSign))
 
     def Repeat(self, repeat):
         if repeat.specifier() == 'volta':
@@ -644,9 +678,9 @@ class ParseSource():
         elif command.token == '\\codaMark':
             self.mediator.new_navigation('coda')
         elif command.token == '\\sustainOn':
-            self.mediator.new_pedal('start')
+            self.mediator.new_pedal('start', src=ly2xml_mediator.token_src_span(command.token))
         elif command.token == '\\sustainOff':
-            self.mediator.new_pedal('stop')
+            self.mediator.new_pedal('stop', src=ly2xml_mediator.token_src_span(command.token))
         elif command.token == '\\breathe':
             art = type('',(object,),{"token": "\\breathe"})()
             self.Articulation(art)

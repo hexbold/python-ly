@@ -318,3 +318,68 @@ def regenerate_xml():
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'regenerate':
         regenerate_xml()
+
+
+def test_srcmap():
+    # The opt-in source map (ly/musicxml/srcmap.py): with srcmap=True the writer
+    # records, for every emitted note/rest/directive, the span in the parsed text
+    # it came from — without changing the XML output at all.
+    source = ('\\version "2.18.0"\n'
+              '\\header { title = "Probe" }\n'
+              'up = { \\clef treble \\key c \\major \\time 4/4 \\tempo 4 = 96\n'
+              '  c\'4\\p-. d\'8 ees\'8 e\'4 <g\' b\'>4~ | <g\' b\'>4 q4 r4 gis\'4 }\n'
+              '\\score { \\new Staff \\up \\midi {} }\n')
+
+    def to_string(xml):
+        sio = io.BytesIO()
+        xml.write(sio, "utf-8")
+        return sio.getvalue().decode("utf-8")
+
+    plain = ly.musicxml.writer()
+    plain.parse_text(source)
+    baseline = to_string(plain.musicxml())
+
+    e = ly.musicxml.writer(srcmap=True)
+    e.parse_text(source)
+    output = to_string(e.musicxml())
+    assert output == baseline          # collection never changes the XML
+    m = e.srcmap()
+
+    assert m["v"] == 1 and m["positions_valid"] is True
+    assert m["parts"] == [{"name": "", "staves": 1}]
+    # every <note> element has exactly one event, in emission order
+    assert len(m["events"]) == output.count("<note")
+
+    def sliced(span):
+        return source[span[0]:span[1]]
+
+    spans = [sliced(e["span"]) for e in m["events"] if "span" in e]
+    # q-copies are materialized without source tokens and carry no span
+    assert spans == ["c'", "d'", "ees'", "e'", "g'", "b'",
+                     "g'", "b'", "r", "gis'"]
+    # chord members share the event ordinal, counting `member` up
+    chord = [e for e in m["events"] if e["measure"] == 1 and e["idx"] == 4]
+    assert [(e["member"], sliced(e["span"])) for e in chord] == [(0, "g'"), (1, "b'")]
+    # note-attached tokens (dynamics, articulations, ties) carry their own spans
+    first = m["events"][0]
+    attach = {a[0]: sliced((a[2], a[3])) for a in first["attach"]}
+    assert attach["dyn"] == "\\p" and attach["artic"] == "."
+    # standalone directives and header fields map to their full source text
+    objs = {o["kind"]: sliced(o["span"]) for o in m["objects"]}
+    assert objs["key"] == "\\key c \\major"
+    assert objs["time"] == "\\time 4/4"
+    assert objs["clef"] == "\\clef treble"
+    assert objs["tempo"] == "\\tempo 4 = 96"
+    assert sliced(m["header"]["title"]) == '"Probe"'
+
+
+def test_srcmap_relative_positions_flagged_invalid():
+    # \relative input is converted to absolute pitches before parsing, so the
+    # spans index the CONVERTED text — the map must say its positions are not
+    # valid for the caller's original text.
+    source = ('\\version "2.18.0"\n'
+              "\\score { \\relative c'' { c4 d e f } \\midi {} }\n")
+    e = ly.musicxml.writer(srcmap=True)
+    e.parse_text(source)
+    e.musicxml()
+    assert e.srcmap()["positions_valid"] is False
