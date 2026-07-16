@@ -245,7 +245,24 @@ class Reader(object):
     @_markup(lex.StringStart)
     @_scheme(lex.StringStart)
     def handle_string_start(self, t, source=None):
-        return self.factory(String, t, True)
+        item = self.factory(String, t, True)
+        # LilyPond quoted assignment: "vc.1" = { ... } — an arbitrary quoted name
+        # (referenced as \"vc.1"). Only lilypond-mode strings can start one; a
+        # markup or scheme string is never an assignment name.
+        if isinstance(t, lilypond.StringQuotedStart):
+            for t2 in skip(self.source):
+                if isinstance(t2, lilypond.EqualSign):
+                    a = self.factory(Assignment, t)
+                    a.append(item)
+                    a.tokens = (t2,)
+                    for i in self.read():
+                        a.append(i)
+                        break
+                    return a
+                else:
+                    self.source.pushback()
+                break
+        return item
     
     @_tokencls(
         lilypond.DecimalValue,

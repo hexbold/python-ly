@@ -124,6 +124,14 @@ def test_variable_dotted():
     compare_output('variable_dotted')
 
 
+def test_quoted_vars():
+    # Quoted assignments ("mel.1" = ...) referenced as \"mel.1" used to be
+    # dropped silently (exit 0, zero notes): the lexer had no rule for a
+    # backslash before a quoted string, and a quoted name was never read as
+    # an Assignment.
+    compare_output('quoted_vars')
+
+
 def test_tempo_before_music():
     compare_output('tempo_before_music')
 

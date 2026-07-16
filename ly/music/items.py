@@ -942,8 +942,15 @@ class Command(Item):
 class UserCommand(Music):
     """A user command, most probably referring to music."""
     def name(self):
-        """Return the name of this user command (without the leading backslash)."""
-        return self.token[1:]
+        """Return the name of this user command (without the leading backslash).
+
+        For a quoted reference (``\\"vc.1"``) the name is the string contents,
+        so it finds the matching quoted assignment (``"vc.1" = ...``).
+        """
+        name = self.token[1:]
+        if name[:1] == '"':
+            name = name[1:-1]
+        return name
     
     def value(self):
         """Find the value assigned to this variable."""
@@ -1070,7 +1077,13 @@ class Assignment(Item):
         without the backslash) finds this assignment. Only DIRECT children
         count — PathItems nested inside the assigned value (e.g. an
         \\override path in the music) must not leak into the name.
+
+        For quoted assignments (``"vc.1" = ...``) the name is the quoted
+        string's contents, matching a quoted reference ``\\"vc.1"``.
         """
+        if (len(self) and isinstance(self[0], String)
+                and isinstance(self.token, lilypond.StringQuotedStart)):
+            return self[0].value()
         return self.token + ''.join(
             p.token for p in self if isinstance(p, PathItem))
     

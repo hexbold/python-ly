@@ -794,6 +794,17 @@ class UserCommand(IdentifierRef):
     pass
 
 
+class UserCommandQuoted(UserCommand):
+    r"""A reference to a quoted identifier, e.g. ``\"vc.1"``.
+
+    LilyPond allows assigning to an arbitrary quoted name (``"vc.1" = { ... }``)
+    and referencing it as ``\"vc.1"``. This is deliberately NOT part of the
+    shared IdentifierRef rx group: a quoted name can never be a keyword, so the
+    Keyword/Command/UserCommand test_match dispatch is not involved.
+    """
+    rx = r'\\"[^"\\]*"'
+
+
 class SimultaneousOrSequentialCommand(Keyword):
     rx = r"\\(simultaneous|sequential)" + re_identifier_end
 
@@ -945,6 +956,7 @@ command_items = (
     Command,
     SimultaneousOrSequentialCommand,
     UserCommand,
+    UserCommandQuoted,
 )
 
 
