@@ -391,3 +391,38 @@ def test_srcmap_relative_positions_flagged_invalid():
     e.parse_text(source)
     e.musicxml()
     assert e.srcmap()["positions_valid"] is False
+
+
+def test_direction_staff_in_multistaff_part():
+    # Issue 46: a note-attached <direction> (dynamics, wedge, pedal) must carry its
+    # note's <staff> in a multi-staff part — without it MusicXML defaults the direction
+    # to staff 1, so every left-hand piano dynamic renders under the RIGHT hand's staff.
+    # Single-staff parts keep emitting no <staff> (output unchanged).
+    source = ('\\version "2.18.0"\n'
+              "rh = { e''2\\mf d''2\\< c''2 b'2\\! }\n"
+              "lh = { \\clef bass c2\\p e2 g2\\sustainOn c'2\\sustainOff }\n"
+              "\\score { \\new PianoStaff << \\new Staff \\rh \\new Staff \\lh >> \\midi {} }\n")
+    e = ly.musicxml.writer()
+    e.parse_text(source)
+    xml = e.musicxml()
+    sio = io.BytesIO()
+    xml.write(sio, "utf-8")
+    output = sio.getvalue().decode("utf-8")
+
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(output)
+    staffed = [d.findtext("staff") for d in root.iter("direction")]
+    # rh: mf + wedge start + wedge stop on staff 1; lh: p + two pedals on staff 2
+    assert staffed.count("1") == 3
+    assert staffed.count("2") == 3
+    assert None not in staffed
+
+    single = ('\\version "2.18.0"\n'
+              "\\score { { c'2\\p d'2 } \\midi {} }\n")
+    e = ly.musicxml.writer()
+    e.parse_text(single)
+    xml = e.musicxml()
+    sio = io.BytesIO()
+    xml.write(sio, "utf-8")
+    root = ET.fromstring(sio.getvalue())
+    assert [d.findtext("staff") for d in root.iter("direction")] == [None]

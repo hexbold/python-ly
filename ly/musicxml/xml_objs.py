@@ -302,29 +302,31 @@ class IterateXmlObjs():
 
     def before_note(self, obj):
         """Xml-nodes before note."""
-        self._add_dynamics([d for d in obj.dynamic if d.before])
+        self._add_dynamics([d for d in obj.dynamic if d.before], obj.staff)
         if obj.oct_shift and not obj.oct_shift.octdir == 'stop':
             self.musxml.add_octave_shift(obj.oct_shift.plac, obj.oct_shift.octdir, obj.oct_shift.size)
 
     def after_note(self, obj):
         """Xml-nodes after note."""
-        self._add_dynamics([d for d in obj.dynamic if not d.before])
+        self._add_dynamics([d for d in obj.dynamic if not d.before], obj.staff)
         if obj.oct_shift and obj.oct_shift.octdir == 'stop':
             self.musxml.add_octave_shift(obj.oct_shift.plac, obj.oct_shift.octdir, obj.oct_shift.size)
 
-    def _add_dynamics(self, dyns):
-        """Add XML nodes for list of Dynamics objects."""
+    def _add_dynamics(self, dyns, staff=None):
+        """Add XML nodes for list of Dynamics objects. ``staff`` pins each direction to its
+        note's staff (issue 46): without it a direction defaults to staff 1, putting every
+        left-hand piano dynamic under the right hand's staff."""
         for d in dyns:
             if isinstance(d, DynamicsMark):
-                self.musxml.add_dynamic_mark(d.sign)
+                self.musxml.add_dynamic_mark(d.sign, staff)
             elif isinstance(d, DynamicsWedge):
-                self.musxml.add_dynamic_wedge(d.sign)
+                self.musxml.add_dynamic_wedge(d.sign, staff)
             elif isinstance(d, DynamicsText):
-                self.musxml.add_dynamic_text(d.sign)
+                self.musxml.add_dynamic_text(d.sign, staff)
             elif isinstance(d, DynamicsDashes):
-                self.musxml.add_dynamic_dashes(d.sign)
+                self.musxml.add_dynamic_dashes(d.sign, staff)
             elif isinstance(d, Pedal):
-                self.musxml.add_pedal(d.sign)
+                self.musxml.add_pedal(d.sign, staff)
 
     def gener_xml_mus(self, obj):
         """Nodes generic for both notes and rests."""

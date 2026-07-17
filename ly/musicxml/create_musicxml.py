@@ -657,32 +657,44 @@ class CreateMusicXML():
     def add_direction(self, pos="above"):
         self.direction = etree.SubElement(self.current_bar, "direction", placement=pos)
 
-    def add_dynamic_mark(self, dyn):
+    def _direction_staff(self, direction, staff):
+        """Pin a note-attached direction to its note's staff. Without <staff> a direction
+        defaults to staff 1, so in a multi-staff part (piano) every left-hand dynamic
+        would render under the RIGHT hand's staff — between the staves."""
+        if staff:
+            staffnode = etree.SubElement(direction, "staff")
+            staffnode.text = str(staff)
+
+    def add_dynamic_mark(self, dyn, staff=None):
         """Add specified dynamic mark."""
         direction = etree.SubElement(self.current_bar, "direction", placement='below')
         dirtypenode = etree.SubElement(direction, "direction-type")
         dyn_node = etree.SubElement(dirtypenode, "dynamics")
         dynexpr_node = etree.SubElement(dyn_node, dyn)
+        self._direction_staff(direction, staff)
 
-    def add_dynamic_wedge(self, wedge_type):
+    def add_dynamic_wedge(self, wedge_type, staff=None):
         """Add dynamic wedge/hairpin."""
         direction = etree.SubElement(self.current_bar, "direction", placement='below')
         dirtypenode = etree.SubElement(direction, "direction-type")
         dyn_node = etree.SubElement(dirtypenode, "wedge", type=wedge_type)
+        self._direction_staff(direction, staff)
 
-    def add_dynamic_text(self, text):
+    def add_dynamic_text(self, text, staff=None):
         """Add dynamic text."""
         direction = etree.SubElement(self.current_bar, "direction", placement='below')
         dirtypenode = etree.SubElement(direction, "direction-type")
         dyn_node = etree.SubElement(dirtypenode, "words")
         dyn_node.attrib['font-style'] = 'italic'
         dyn_node.text = text
+        self._direction_staff(direction, staff)
 
-    def add_dynamic_dashes(self, text):
+    def add_dynamic_dashes(self, text, staff=None):
         """Add dynamics dashes."""
         direction = etree.SubElement(self.current_bar, "direction", placement='below')
         dirtypenode = etree.SubElement(direction, "direction-type")
         dyn_node = etree.SubElement(dirtypenode, "dashes", type=text)
+        self._direction_staff(direction, staff)
 
     def add_octave_shift(self, plac, octdir, size):
         """Add octave shift."""
@@ -691,11 +703,12 @@ class CreateMusicXML():
         dirtypenode = etree.SubElement(direction, "direction-type")
         dyn_node = etree.SubElement(dirtypenode, "octave-shift", oct_dict)
 
-    def add_pedal(self, pedal_type):
+    def add_pedal(self, pedal_type, staff=None):
         """Add a sustain pedal direction (type 'start' or 'stop')."""
         direction = etree.SubElement(self.current_bar, "direction", placement='below')
         dirtypenode = etree.SubElement(direction, "direction-type")
         etree.SubElement(dirtypenode, "pedal", type=pedal_type)
+        self._direction_staff(direction, staff)
 
     def add_dirwords(self, words):
         """Add words in direction, e. g. a tempo mark."""
