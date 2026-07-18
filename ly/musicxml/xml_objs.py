@@ -79,6 +79,10 @@ class IterateXmlObjs():
         for ctag in score.creators:
             self.musxml.add_creator(ctag, score.creators[ctag])
         for itag in score.info:
+            if itag == "subtitle":
+                # <identification> has no such element (schema-invalid there);
+                # the subtitle appears on the page via its <credit> block below
+                continue
             self.musxml.create_score_info(itag, score.info[itag])
         if score.rights:
             if len(score.rights) > 1:
@@ -86,6 +90,8 @@ class IterateXmlObjs():
                     self.musxml.add_rights(right[0], right[1])
             else:
                 self.musxml.add_rights(score.rights[0][0])
+        self.musxml.create_credits(
+            score.title, score.info.get("subtitle"), score.creators)
         for p in score.partlist:
             if isinstance(p, ScorePart):
                 self.iterate_part(p)

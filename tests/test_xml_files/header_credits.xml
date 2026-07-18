@@ -2,10 +2,11 @@
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 2.0 Partwise//EN"
                                 "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="3.0">
-  <movement-title>Header Order</movement-title>
+  <movement-title>Credit Test</movement-title>
   <identification>
     <creator type="composer">A. Composer</creator>
-    <rights>2026</rights>
+    <creator type="poet">A. Poet</creator>
+    <creator type="arranger">An. Arranger</creator>
     <encoding>
       <software>python-ly 0.9.10</software>
       <encoding-date>2026-07-18</encoding-date>
@@ -13,11 +14,23 @@
   </identification>
   <credit page="1">
     <credit-type>title</credit-type>
-    <credit-words justify="center" valign="top">Header Order</credit-words>
+    <credit-words justify="center" valign="top">Credit Test</credit-words>
+  </credit>
+  <credit page="1">
+    <credit-type>subtitle</credit-type>
+    <credit-words justify="center" valign="top">The Subtitle</credit-words>
   </credit>
   <credit page="1">
     <credit-type>composer</credit-type>
     <credit-words justify="right" valign="bottom">A. Composer</credit-words>
+  </credit>
+  <credit page="1">
+    <credit-type>lyricist</credit-type>
+    <credit-words justify="left" valign="bottom">A. Poet</credit-words>
+  </credit>
+  <credit page="1">
+    <credit-type>arranger</credit-type>
+    <credit-words justify="right" valign="bottom">An. Arranger</credit-words>
   </credit>
   <part-list>
     <score-part id="P1">

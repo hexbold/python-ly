@@ -73,6 +73,40 @@ class CreateMusicXML():
         mov_title.text = title
         self.root.insert(0, mov_title)
 
+    def create_credits(self, title, subtitle, creators):
+        """Create <credit> blocks for the page header (title, subtitle, composer,
+        lyricist, arranger). Renderers that draw the header from credits (Verovio,
+        MuseScore) would otherwise show only the movement-title — the composer
+        would exist merely as <identification> metadata and never appear on the
+        page."""
+        # justify/valign follow engraving convention (LilyPond's own header layout):
+        # title/subtitle centered on top, composer/arranger right, lyricist left.
+        placing = {"title": ("center", "top"), "subtitle": ("center", "top"),
+                   "composer": ("right", "bottom"), "arranger": ("right", "bottom"),
+                   "lyricist": ("left", "bottom")}
+        entries = []
+        if title:
+            entries.append(("title", title))
+        if subtitle:
+            entries.append(("subtitle", subtitle))
+        for ctype in ("composer", "poet", "lyricist", "arranger"):
+            if creators.get(ctype):
+                # MusicXML's credit vocabulary has no "poet" — lyricist is the term
+                entries.append(("lyricist" if ctype == "poet" else ctype,
+                                creators[ctype]))
+        # score-partwise order: …, identification?, defaults?, credit*, part-list
+        insert_at = list(self.root).index(self.partlist)
+        for ctype, text in entries:
+            credit = etree.Element("credit", page="1")
+            credit_type = etree.SubElement(credit, "credit-type")
+            credit_type.text = ctype
+            justify, valign = placing[ctype]
+            words = etree.SubElement(credit, "credit-words",
+                                     {"justify": justify, "valign": valign})
+            words.text = text
+            self.root.insert(insert_at, credit)
+            insert_at += 1
+
     def create_score_info(self, tag, info, attr={}):
         """Create score info."""
         info_node = etree.Element(tag, attr)

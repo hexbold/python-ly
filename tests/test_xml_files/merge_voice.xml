@@ -6,9 +6,13 @@
   <identification>
     <encoding>
       <software>python-ly 0.9.10</software>
-      <encoding-date>2026-07-16</encoding-date>
+      <encoding-date>2026-07-18</encoding-date>
     </encoding>
   </identification>
+  <credit page="1">
+    <credit-type>title</credit-type>
+    <credit-words justify="center" valign="top">Somebody to love</credit-words>
+  </credit>
   <part-list>
     <part-group type="start" number="1">
       <group-symbol>bracket</group-symbol>

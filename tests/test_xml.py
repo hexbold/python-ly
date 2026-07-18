@@ -116,6 +116,13 @@ def test_header_tagline():
     compare_output('header_tagline')
 
 
+def test_header_credits():
+    # Header fields must also emit <credit> blocks — page-header renderers
+    # (Verovio, MuseScore) draw only the title without them. "poet" maps to
+    # the credit vocabulary's lyricist.
+    compare_output('header_credits')
+
+
 def test_tremolo_repeat():
     compare_output('tremolo_repeat')
 
