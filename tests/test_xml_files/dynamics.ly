@@ -1,6 +1,6 @@
 \version "2.18.2"
 
 \score {
-  { c4\cresc c4 c4\! d\dim d\! e\> e\! }
+  { c4\cresc c4 c4\! d\dim d\! e\> e\! f\decresc f\! }
   \layout {}
 }

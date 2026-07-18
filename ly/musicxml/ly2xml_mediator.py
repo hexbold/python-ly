@@ -1022,7 +1022,7 @@ class Mediator():
 
     def new_dynamics(self, dynamics, src=None):
         hairpins = {'<': 'crescendo', '>': 'diminuendo'}
-        text_dyn = {'cresc': 'cresc.', 'decresc': 'descresc.',
+        text_dyn = {'cresc': 'cresc.', 'decresc': 'decresc.',
                     'dim': 'dim.'}
         if dynamics == '!':
             if self.ongoing_wedge:
