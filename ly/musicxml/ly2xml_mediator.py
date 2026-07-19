@@ -912,6 +912,9 @@ class Mediator():
         multp = int(bs[1] * (bs[0]/self.current_time))
         for i in range(1, int(multp)):
             rest_copy = xml_objs.BarRest(dur, voice=voc, show_type=st, skip=sk)
+            # keep the copies on the owner's staff — without this they default to staff 1
+            # in the source map, splitting a lower-staff R1*n run across staves
+            rest_copy.staff = self.current_note.staff
             self.add_to_bar(rest_copy)
             self.increase_bar_dura(dur)
 

@@ -388,6 +388,23 @@ def test_srcmap():
     assert sliced(m["header"]["title"]) == '"Probe"'
 
 
+def test_srcmap_mrest_run_copies_keep_the_staff():
+    # R1*n materializes n-1 copy bars; the copies carry no span but MUST keep the
+    # owner's staff — they used to default to staff 1, splitting a lower-staff run
+    # across staves in the map.
+    source = ('\\version "2.18.0"\n'
+              'up = { \\clef treble \\time 4/4 c\'\'1 | d\'\'1 | e\'\'1 | }\n'
+              'lo = { \\clef bass \\time 4/4 c1 | R1*2 | }\n'
+              '\\score { \\new PianoStaff << \\new Staff \\up \\new Staff \\lo >> \\midi {} }\n')
+    e = ly.musicxml.writer(srcmap=True)
+    e.parse_text(source)
+    e.musicxml()
+    m = e.srcmap()
+    mrests = [ev for ev in m["events"] if ev["kind"] == "mrest"]
+    assert [ev.get("staff") for ev in mrests] == [2, 2]
+    assert mrests[0].get("span") and not mrests[1].get("span")
+
+
 def test_srcmap_relative_positions_flagged_invalid():
     # \relative input is converted to absolute pitches before parsing, so the
     # spans index the CONVERTED text — the map must say its positions are not
