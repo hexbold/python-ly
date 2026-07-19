@@ -57,6 +57,8 @@ be used for editing.
 
 from __future__ import unicode_literals
 
+from fractions import Fraction
+
 
 class SrcMapCollector():
     """Collects source spans while IterateXmlObjs emits the MusicXML."""
@@ -124,6 +126,13 @@ class SrcMapCollector():
         dur = getattr(obj, "src_dur", None)
         if dur:
             entry["dur_span"] = [dur[0], dur[1]]
+        try:
+            # notated sounding length in whole notes (base * scaling, incl. dots and
+            # *n/m scaling; tuplet time-modification is NOT folded in here)
+            d = Fraction(obj.duration[0]) * Fraction(obj.duration[1])
+            entry["dur"] = [d.numerator, d.denominator]
+        except (TypeError, IndexError, ZeroDivisionError):
+            pass
         if kind == "note":
             # alter can be a Fraction (get_xml_alter returns the exact value when
             # integral) — normalize so the map is JSON-serializable

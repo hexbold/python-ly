@@ -375,6 +375,9 @@ def test_srcmap():
     # chord members share the event ordinal, counting `member` up
     chord = [e for e in m["events"] if e["measure"] == 1 and e["idx"] == 4]
     assert [(e["member"], sliced(e["span"])) for e in chord] == [(0, "g'"), (1, "b'")]
+    # every event carries its notated length in whole notes (dur), dots folded in
+    assert m["events"][0]["dur"] == [1, 4]
+    assert m["events"][1]["dur"] == [1, 8]
     # note-attached tokens (dynamics, articulations, ties) carry their own spans
     first = m["events"][0]
     attach = {a[0]: sliced((a[2], a[3])) for a in first["attach"]}
