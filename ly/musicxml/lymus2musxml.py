@@ -596,6 +596,12 @@ class ParseSource():
         # acciaccatura and slashedGrace print a slashed stem; grace and appoggiatura do not
         self.grace_slash = 1 if grace.token in ('\\acciaccatura', '\\slashedGrace') else 0
 
+    def AfterGrace(self, node):
+        r"""\afterGrace main grace: nothing to do at the wrapper level — the
+        main music is walked normally and the parser wraps the grace music in
+        a Grace item, which sets grace timing via the Grace handler above."""
+        pass
+
     def TimeSignature(self, timeSign):
         self.mediator.new_time(timeSign.numerator(), timeSign.fraction(), self.numericTime,
                                src=ly2xml_mediator.item_src_span(timeSign))

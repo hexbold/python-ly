@@ -453,3 +453,35 @@ def test_direction_staff_in_multistaff_part():
     xml.write(sio, "utf-8")
     root = ET.fromstring(sio.getvalue())
     assert [d.findtext("staff") for d in root.iter("direction")] == [None]
+
+
+def test_after_grace_with_articulation():
+    r"""\afterGrace main-note-with-postfix { graces }: the postfix (\trill)
+    must not be counted as the second music argument — the grace group used
+    to escape the wrapper as REAL timed notes, shifting the voice by the
+    group's duration (audibly desyncing the hands after every trill)."""
+    source = ('\\version "2.24.0"\n'
+              '\\language "english"\n'
+              '\\score { \\new Staff { \\time 12/8 '
+              "\\afterGrace fs''2.\\trill { e''16[ fs''16] } c''2. } \\layout {} }\n")
+    w = ly.musicxml.writer()
+    w.parse_text(source)
+    xml = w.musicxml()
+    sio = io.BytesIO()
+    xml.write(sio, "utf-8")
+    output = sio.getvalue().decode("utf-8")
+
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(output)
+    notes = list(root.iter("note"))
+    graces = [n for n in notes if n.find("grace") is not None]
+    timed = [n for n in notes if n.find("grace") is None]
+    # the two termination notes are grace notes without duration
+    assert len(graces) == 2
+    assert all(n.find("duration") is None for n in graces)
+    # the timed notes fill the 12/8 measure exactly: 2. + 4. and nothing more
+    divisions = int(root.find(".//divisions").text)
+    assert sum(int(n.findtext("duration")) for n in timed) == divisions * 6
+    # the trill survives on the main note
+    assert len(root.findall(".//trill-mark")) == 1
+    validate_xml(output)

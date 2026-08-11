@@ -646,10 +646,22 @@ class Reader(object):
     @_commands('\\afterGrace')
     def handle_after_grace(self, t, source):
         item = self.factory(AfterGrace, t)
-        for i in itertools.islice(self.read(source), 2):
+        # \afterGrace takes two MUSIC arguments (main music, grace music).
+        # Postfix items following the first argument (\trill, dynamics, ties)
+        # are yielded by read() as separate items and belong to the main
+        # music — counting them as the second argument (the old islice(2))
+        # made the grace group escape as a timed sibling: every
+        # `\afterGrace c2.\trill { d16 c16 }` shifted the voice by the
+        # grace group's real duration.
+        music_count = 0
+        for i in self.read(source):
             item.append(i)
+            if isinstance(i, (Music, Durable)):
+                music_count += 1
+                if music_count == 2:
+                    break
         # put the grace music in a Grace item
-        if len(item) > 1:
+        if music_count > 1:
             i = self.factory(Grace, position=item[-1].position)
             i.append(item[-1])
             item.append(i)
