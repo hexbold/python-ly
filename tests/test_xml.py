@@ -558,3 +558,14 @@ def test_tuplet_span_duration_not_inherited():
     become the inherited duration of the notes inside (they came out double
     length, overfilling the measure)."""
     compare_output('tuplet_span')
+
+
+def test_polyphony_straddling_barline():
+    r"""A << .. \\ .. >> block crossing a barline leaves a PARTIAL backup in
+    the second measure; the backup for the next merged voice must still
+    rewind the full measure (summing since the last backup overflowed the
+    measure and time-shifted the rest of the piece). The block's branches
+    also skip voice numbers claimed by explicit \voiceX commands anywhere
+    in the source, so a branch never double-books a sibling voice (readers
+    merge the two streams destructively or reject the file)."""
+    compare_output('polyphony_straddling_barline')

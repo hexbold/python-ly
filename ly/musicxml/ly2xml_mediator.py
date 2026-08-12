@@ -121,6 +121,7 @@ class Mediator():
         self.slur_stack = []
         self.prev_slurrable = None
         self.snippet_state = []
+        self.reserved_voicenrs = set()
         self.tied_pitches = set()
         self.chord_tie_stops = set()
         self.multiple_rest = False
@@ -253,7 +254,14 @@ class Mediator():
         if add:
             if not self.store_voicenr:
                 self.store_voicenr = self.voice
-            self.voice += 1
+            # a << .. \\ .. >> branch: skip numbers claimed by explicit
+            # \voiceX commands anywhere in the source (see
+            # reserve_explicit_voices) so the branch never double-books a
+            # sibling voice's number
+            nxt = self.voice + 1
+            while nxt in self.reserved_voicenrs:
+                nxt += 1
+            self.voice = nxt
         elif nr:
             self.voice = nr
         else:

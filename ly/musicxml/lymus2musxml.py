@@ -176,6 +176,7 @@ class ParseSource():
     def parse_tree(self, mustree):
         """Parse the LilyPond source as a ly.music node tree."""
         # print(mustree.dump())
+        self.reserve_explicit_voices(mustree)
         header_nodes = self.iter_header(mustree)
         if header_nodes:
             self.parse_nodes(header_nodes)
@@ -186,6 +187,30 @@ class ParseSource():
             mus_nodes = self.find_score_sub(mustree)
         self.mediator.new_section("fallback") #fallback/default section
         self.parse_nodes(mus_nodes)
+
+    def reserve_explicit_voices(self, tree):
+        r"""Collect every \voiceOne..\voiceFour number the source uses.
+
+        A ``<< .. \\ .. >>`` branch is numbered automatically (enclosing
+        voice + 1). When the block sits inside an explicit ``\new Voice``,
+        that number can double-book a SIBLING voice's \voiceX number — two
+        streams then share one MusicXML voice and the reader merges them
+        destructively (or rejects the file). The numbers reserved here are
+        skipped by the branch allocator. Both the raw value and its
+        second-piano-staff offset (+4) are reserved, since the sibling may
+        live on the other staff of a PianoStaff. Sources without \voiceX
+        commands reserve nothing, keeping the upstream numbering for the
+        plain top-level ``<< {..} \\ {..} >>`` idiom."""
+        voice_cmds = ('\\voiceOne', '\\voiceTwo', '\\voiceThree', '\\voiceFour')
+        def walk(node):
+            for child in node:
+                if (isinstance(child, ly.music.items.Command)
+                        and child.token in voice_cmds):
+                    nr = voice_cmds.index(child.token) + 1
+                    self.mediator.reserved_voicenrs.add(nr)
+                    self.mediator.reserved_voicenrs.add(nr + 4)
+                walk(child)
+        walk(tree)
 
     def parse_nodes(self, nodes):
         """Work through all nodes by calling the function with the

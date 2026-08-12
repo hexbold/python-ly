@@ -682,29 +682,30 @@ class Bar():
     def create_backup(self):
         """ Calculate and create backup object.
 
-        The backup must rewind to the START of the measure, and after a
-        BarBackup the position IS the start of the measure — so sum the
-        durations written since the LAST backup (the voice just added).
-        Stopping at the first backup instead (as this method used to)
-        returns the length of whatever precedes it, which is 0 when a
-        merged bar starts with only attributes — e.g. a staff bar holding
-        just clef/time that voices are merged into. add_backup() silently
-        drops a 0 duration, so the voices then played sequentially.
+        The backup must rewind to the START of the measure, but not every
+        BarBackup already in the bar rewinds that far: a merged-in
+        ``<< .. \\ .. >>`` snippet carries a PARTIAL backup that only rewinds
+        to the block's start position. Simulate the position cursor instead —
+        add each sounding length, subtract each backup's own rewind — which is
+        exact for any mix of full and partial backups. (Summing since the last
+        backup assumed every backup lands on position 0; after a snippet whose
+        block ends mid-bar the next voice's backup came out short, the measure
+        overflowed, and the rest of the piece shifted in time.)
 
         Sum the sounding lengths: a grace note takes no time in the measure and a
         tuplet note is shorter than it is written. Adding the written durations up
         instead overshoots the start of the measure and lands the next voice early
         (an eighth early after one acciaccatura).
         """
-        length = Fraction(0)
+        pos = Fraction(0)
         for obj in self.obj_list:
             if isinstance(obj, BarBackup):
-                length = Fraction(0)
+                pos -= Fraction(obj.duration[0]) * Fraction(obj.duration[1])
             elif isinstance(obj, BarMus) and not obj.chord:
                 if isinstance(obj, BarNote) and obj.grace[0]:
                     continue
-                length += event_length(obj)
-        self.add(BarBackup((length, 1)))
+                pos += event_length(obj)
+        self.add(BarBackup((pos, 1)))
 
     def is_skip(self, obj_list=None):
         """ Check if bar has nothing but skips. """
