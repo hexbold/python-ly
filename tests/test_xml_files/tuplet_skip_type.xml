@@ -16,7 +16,11 @@
   <part id="P1">
     <measure number="1">
       <attributes>
-        <divisions>6</divisions>
+        <divisions>12</divisions>
+        <key>
+          <fifths>0</fifths>
+          <mode>major</mode>
+        </key>
         <time symbol="common">
           <beats>4</beats>
           <beat-type>4</beat-type>
@@ -31,35 +35,42 @@
           <step>C</step>
           <octave>4</octave>
         </pitch>
-        <duration>2</duration>
+        <duration>12</duration>
         <voice>1</voice>
-        <type>eighth</type>
-        <time-modification>
-          <actual-notes>3</actual-notes>
-          <normal-notes>2</normal-notes>
-        </time-modification>
-        <beam number="1">begin</beam>
-        <notations>
-          <tuplet number="1" type="start" />
-        </notations>
+        <type>quarter</type>
       </note>
       <note>
         <pitch>
           <step>D</step>
           <octave>4</octave>
         </pitch>
-        <duration>2</duration>
+        <duration>4</duration>
         <voice>1</voice>
         <type>eighth</type>
         <time-modification>
           <actual-notes>3</actual-notes>
           <normal-notes>2</normal-notes>
         </time-modification>
-        <beam number="1">end</beam>
+        <notations>
+          <tuplet number="1" type="start" />
+        </notations>
+      </note>
+      <note print-object="no">
+        <rest />
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
       </note>
       <note>
-        <rest />
-        <duration>2</duration>
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
         <voice>1</voice>
         <type>eighth</type>
         <time-modification>
@@ -68,23 +79,6 @@
         </time-modification>
         <notations>
           <tuplet number="1" type="stop" />
-        </notations>
-      </note>
-      <note>
-        <pitch>
-          <step>E</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>2</duration>
-        <voice>1</voice>
-        <type>eighth</type>
-        <time-modification>
-          <actual-notes>3</actual-notes>
-          <normal-notes>2</normal-notes>
-        </time-modification>
-        <beam number="1">begin</beam>
-        <notations>
-          <tuplet number="1" type="start" />
         </notations>
       </note>
       <note>
@@ -92,45 +86,39 @@
           <step>F</step>
           <octave>4</octave>
         </pitch>
-        <duration>2</duration>
+        <duration>18</duration>
         <voice>1</voice>
-        <type>eighth</type>
+        <type>quarter</type>
         <time-modification>
-          <actual-notes>3</actual-notes>
-          <normal-notes>2</normal-notes>
-        </time-modification>
-        <beam number="1">end</beam>
-      </note>
-      <note print-object="no">
-        <rest />
-        <duration>2</duration>
-        <voice>1</voice>
-        <type>eighth</type>
-        <time-modification>
-          <actual-notes>3</actual-notes>
-          <normal-notes>2</normal-notes>
+          <actual-notes>2</actual-notes>
+          <normal-notes>3</normal-notes>
         </time-modification>
         <notations>
+          <tuplet number="1" type="start" />
           <tuplet number="1" type="stop" />
         </notations>
       </note>
-      <note>
-        <pitch>
-          <step>G</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>6</duration>
+      <note print-object="no">
+        <rest />
+        <duration>27</duration>
         <voice>1</voice>
         <type>quarter</type>
+        <dot />
+        <time-modification>
+          <actual-notes>2</actual-notes>
+          <normal-notes>3</normal-notes>
+        </time-modification>
       </note>
+    </measure>
+    <measure number="2">
       <note>
         <pitch>
-          <step>A</step>
+          <step>C</step>
           <octave>4</octave>
         </pitch>
-        <duration>6</duration>
+        <duration>48</duration>
         <voice>1</voice>
-        <type>quarter</type>
+        <type>whole</type>
       </note>
     </measure>
   </part>

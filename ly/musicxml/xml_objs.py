@@ -395,7 +395,11 @@ class IterateXmlObjs():
         """Create rest specific xml-nodes."""
         divdur = self.count_duration(obj.duration, self.divisions)
         if obj.skip:
-            self.musxml.add_hidden_rest(divdur, obj.voice)
+            # inside a tuplet the written type must come along (see
+            # add_hidden_rest); plain skips stay bare like MuseScore's own
+            self.musxml.add_hidden_rest(divdur, obj.voice,
+                                        obj.type if obj.tuplet else '',
+                                        obj.dot if obj.tuplet else 0)
         else:
             self.musxml.new_rest(divdur, obj.type, obj.pos,
             obj.dot, obj.voice)

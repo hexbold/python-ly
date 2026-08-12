@@ -586,3 +586,11 @@ def test_voice_switch_midstream():
     mid-measure double-booked a sibling's number or flipped numbers inside
     one backup stream - MuseScore rejected the file."""
     compare_output('voice_switch_midstream')
+
+
+def test_tuplet_skip_type():
+    r"""A spacer rest inside \tuplet: the hidden rest carries its written
+    <type> and dots. A tuplet member with time-modification but no type is
+    unreadable (the ratio cannot be reconstructed) and MuseScore rejects
+    the whole file. Plain skips outside tuplets stay bare."""
+    compare_output('tuplet_skip_type')

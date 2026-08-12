@@ -424,16 +424,24 @@ class CreateMusicXML():
         dura_node = etree.SubElement(skip, "duration")
         dura_node.text = str(duration)
 
-    def add_hidden_rest(self, duration, voice):
+    def add_hidden_rest(self, duration, voice, durtype='', dot=0):
         """An invisible placeholder rest (a LilyPond spacer): occupies time,
         prints nothing. Encoded the way MuseScore exports hidden rests
         (print-object="no") — a trailing <forward> gap instead leaves the
-        measure short in readers that derive length from content."""
+        measure short in readers that derive length from content.
+
+        A skip inside a \\tuplet passes its written type and dots: a tuplet
+        member with time-modification but no <type> is unreadable (the ratio
+        cannot be reconstructed) and MuseScore rejects the whole file."""
         self.current_note = etree.SubElement(
             self.current_bar, "note", {"print-object": "no"})
         self.add_rest()
         self.add_div_duration(duration)
         self.add_voice(voice)
+        if durtype:
+            self.add_duration_type(durtype)
+        for i in range(dot):
+            self.add_dot()
 
     def add_div_duration(self, divdur):
         """Create new duration """
