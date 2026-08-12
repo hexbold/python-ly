@@ -569,3 +569,11 @@ def test_polyphony_straddling_barline():
     in the source, so a branch never double-books a sibling voice (readers
     merge the two streams destructively or reject the file)."""
     compare_output('polyphony_straddling_barline')
+
+
+def test_simultan_meter_scope():
+    r"""A \time change inside one voice of a << .. >> group: parallel
+    voices all start at the meter the group opened with, not at whatever
+    the previously parsed sibling ended in (voice 2's bars closed on the
+    wrong sums from its first bar, mincing the whole part)."""
+    compare_output('simultan_meter_scope')

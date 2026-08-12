@@ -122,6 +122,7 @@ class Mediator():
         self.prev_slurrable = None
         self.snippet_state = []
         self.reserved_voicenrs = set()
+        self.simultan_time_stack = []
         self.tied_pitches = set()
         self.chord_tie_stops = set()
         self.multiple_rest = False
@@ -665,6 +666,28 @@ class Mediator():
         except ValueError:
             idx = len(bar.obj_list)
         bar.obj_list.insert(idx, new_bar_attr)
+
+    def push_time_scope(self):
+        r"""A ``<< .. >>`` of parallel music opens: remember the meter in
+        effect. Sections are parsed one after another, but every parallel
+        voice STARTS at the same musical moment — a \time change inside one
+        voice must not leak into the bar accounting of its SIBLINGS (the
+        next voice's bars closed on the wrong sums from its first bar on,
+        mincing the whole part)."""
+        self.simultan_time_stack.append(self.current_time)
+
+    def restore_time_scope(self):
+        """A sibling voice section starts: bar math restarts at the meter
+        the enclosing ``<< .. >>`` opened with."""
+        if self.simultan_time_stack:
+            self.current_time = self.simultan_time_stack[-1]
+
+    def pop_time_scope(self):
+        """The ``<< .. >>`` ended. The last voice's meter stays current:
+        music after the block continues in the meter last set, matching
+        LilyPond's score-global Timing as far as sequential parsing can."""
+        if self.simultan_time_stack:
+            self.simultan_time_stack.pop()
 
     def new_time(self, num, den, numeric=False, src=None):
         self.current_time = Fraction(num, den.denominator)

@@ -311,6 +311,7 @@ class ParseSource():
                 pass
             else:
                 self.mediator.new_section('simultan')
+                self.mediator.push_time_scope()
                 self.sims_and_seqs.append('sim')
         elif musicList.token == '{':
             self.sims_and_seqs.append('seq')
@@ -361,6 +362,9 @@ class ParseSource():
                 self.mediator.new_section(context_id)
             else:
                 self.mediator.new_section('voice')
+            # parallel voices all start at the meter their << .. >> opened
+            # with, not at whatever the previously parsed sibling ended in
+            self.mediator.restore_time_scope()
         elif context == 'Devnull':
             self.mediator.new_section('devnull', True)
         else:
@@ -929,10 +933,12 @@ class ParseSource():
             elif self.sim_is_container(end.node):
                 # structural << >>: no section was opened, nothing to close
                 pass
-            elif not self.piano_staff:
-                self.mediator.check_simultan()
-                if self.sims_and_seqs:
-                    self.sims_and_seqs.pop()
+            else:
+                self.mediator.pop_time_scope()
+                if not self.piano_staff:
+                    self.mediator.check_simultan()
+                    if self.sims_and_seqs:
+                        self.sims_and_seqs.pop()
         elif end.node.token == '{':
             if (self.alt_active
                     and isinstance(end.node.parent(), ly.music.items.MusicList)
