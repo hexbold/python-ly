@@ -594,3 +594,12 @@ def test_tuplet_skip_type():
     unreadable (the ratio cannot be reconstructed) and MuseScore rejects
     the whole file. Plain skips outside tuplets stay bare."""
     compare_output('tuplet_skip_type')
+
+
+def test_tie_prune_dangling():
+    r"""Ties LilyPond drops must not survive as dangling starts: a chord
+    tied into a single note keeps only the matching pitch's tie (readers
+    tied the other members to same-pitch notes bars later); a tie into a
+    rest dies; a grace between a tie and its target neither consumes nor
+    stops it (the stop used to be lost)."""
+    compare_output('tie_prune_dangling')

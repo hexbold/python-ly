@@ -125,6 +125,9 @@ class Mediator():
         self.simultan_time_stack = []
         self.tied_pitches = set()
         self.chord_tie_stops = set()
+        self.tie_pending = {}       # pitch key -> BarNote with an unconsumed tie start
+        self.tie_pending_event = -1
+        self.note_event_seq = 0
         self.multiple_rest = False
         self.multiple_rest_bar = None
         self.current_mark = 1
@@ -739,11 +742,11 @@ class Mediator():
         self.clear_chord()
         if is_unpitched:
             self.current_note = self.create_unpitched(note)
-            self.check_current_note(is_unpitched=True)
+            self.check_current_note(is_unpitched=True, is_grace=is_grace)
         else:
             self.current_note = self.create_barnote_from_note(note)
             self.current_lynote = note
-            self.check_current_note(rel)
+            self.check_current_note(rel, is_grace=is_grace)
         self.prev_slurrable = self.current_note
         if self.stem_dir:
             self.current_note.set_stem_direction(self.stem_dir)
@@ -813,15 +816,38 @@ class Mediator():
             self.current_note.src_dur = (token.pos, end)
         self.check_duration(self.current_is_rest)
 
-    def check_current_note(self, rel=False, rest=False, is_unpitched=False):
+    def check_current_note(self, rel=False, rest=False, is_unpitched=False,
+                           is_grace=False):
         """ Perform checks common for all new notes and rests. """
+        # a tie only reaches the event IMMEDIATELY after its note. Once that
+        # event has fully passed (chord members included), unconsumed starts
+        # are dead — LilyPond warns "unterminated tie" and prints nothing,
+        # but a dangling <tie type="start"> makes readers tie the pitch to
+        # whatever same-pitch note comes NEXT, bars later. Grace notes are
+        # ornaments of the following event and do not count as events.
+        if not is_grace and not rest and self.current_note is not None:
+            is_grace = bool(self.current_note.grace[0])
+        if not is_grace:
+            self.note_event_seq += 1
+            if self.tie_pending and self.note_event_seq > self.tie_pending_event + 1:
+                for note in self.tie_pending.values():
+                    if 'start' in note.tie:
+                        note.tie.remove('start')
+                self.tie_pending = {}
+                self.tied = False
+                self.tied_pitches = set()
+                self.chord_tie_stops = set()
         if not rest and not is_unpitched:
             self.set_octave(rel)
-        if not rest:
+        if not rest and not is_grace:
+            # graces are excluded: an ornament between a tie and its target
+            # neither consumes nor stops the tie (c2~ \grace{d8} c2 lost its
+            # stop when the grace note ate the tied state)
             if self.tied:
                 key = self._tie_key(self.current_note)
                 if not self.tied_pitches or key in self.tied_pitches:
                     self.current_note.set_tie('stop')
+                    self.tie_pending.pop(key, None)
                 # chord members are created after their base: remember which
                 # pitches may still take the stop
                 self.chord_tie_stops = self.tied_pitches
@@ -898,7 +924,7 @@ class Mediator():
         self.current_note = self.create_barnote_from_note(note)
         self.current_note.set_duration(duration)
         self.current_lynote = note
-        self.check_current_note(rel)
+        self.check_current_note(rel, is_grace=is_grace)
         self._chord_bar = self.bar  # Save bar ref before increase_bar_dura() may trigger new_bar()
         if not is_grace:  # FIX: grace chords occupy no real time in the bar
             self.increase_bar_dura(duration, tupl_factor)  # FIX: count chord duration for bar boundaries
@@ -920,6 +946,7 @@ class Mediator():
         # the tie stop reaches only members whose pitch was actually tied
         if self.chord_tie_stops and self._tie_key(chord_note) in self.chord_tie_stops:
             chord_note.set_tie('stop')
+            self.tie_pending.pop(self._tie_key(chord_note), None)
         if self.staff:
             chord_note.set_staff(self.staff)
         self._chord_bar.add(chord_note)  # Use saved bar ref (not self.bar which may have advanced)
@@ -1089,6 +1116,10 @@ class Mediator():
                 t.set_tie('start')
         self.tied = True
         self.tied_pitches = {self._tie_key(t) for t in targets}
+        # remember the starts so the ones no following-event pitch consumes
+        # can be pruned (see check_current_note)
+        self.tie_pending = {self._tie_key(t): t for t in targets}
+        self.tie_pending_event = self.note_event_seq
         self._record_attach('tie', '~', src)
 
     def set_slur(self, nr, slur_type, phrasing=False, src=None):
