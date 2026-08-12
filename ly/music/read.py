@@ -608,7 +608,12 @@ class Reader(object):
                     item.numerator, item.denominator = map(int, t.split('/'))
                     item.scaling = 1 / Fraction(t)
                 elif isinstance(t, lilypond.Duration):
+                    # \tuplet n/m DUR { ... }: DUR is the bracket span unit,
+                    # not a sounding duration — it must not become the
+                    # inherited duration of the notes inside the braces
+                    prev = self.prev_duration
                     self.add_duration(item, t, source)
+                    self.prev_duration = prev
                     break
                 elif not isinstance(t, lex.Space):
                     self.source.pushback()

@@ -551,3 +551,10 @@ def test_partial_midpiece_between_repeats():
     or both merge into one overfull measure and every later barline
     shifts."""
     compare_output('partial_midpiece')
+
+
+def test_tuplet_span_duration_not_inherited():
+    r"""\tuplet 3/2 8 { ... }: the 8 is the bracket span unit — it must not
+    become the inherited duration of the notes inside (they came out double
+    length, overfilling the measure)."""
+    compare_output('tuplet_span')
