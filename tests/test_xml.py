@@ -577,3 +577,12 @@ def test_simultan_meter_scope():
     the previously parsed sibling ended in (voice 2's bars closed on the
     wrong sums from its first bar, mincing the whole part)."""
     compare_output('simultan_meter_scope')
+
+
+def test_voice_switch_midstream():
+    r"""\voiceX after the stream already carries music is print-only
+    (stems/rests, e.g. around \change Staff cross-staff travel): the
+    MusicXML voice number is the STREAM's identity. Renumbering it
+    mid-measure double-booked a sibling's number or flipped numbers inside
+    one backup stream - MuseScore rejected the file."""
+    compare_output('voice_switch_midstream')

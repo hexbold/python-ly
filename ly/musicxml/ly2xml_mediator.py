@@ -667,6 +667,14 @@ class Mediator():
             idx = len(bar.obj_list)
         bar.obj_list.insert(idx, new_bar_attr)
 
+    def stream_has_music(self):
+        """True once the section being filled already carries music — used
+        to tell a stream-opening \\voiceX (numbering) from a mid-stream one
+        (print-only: stems/rests, e.g. around cross-staff travel)."""
+        if self.insert_into is None:
+            return False
+        return any(b.has_music() for b in self.insert_into.barlist)
+
     def push_time_scope(self):
         r"""A ``<< .. >>`` of parallel music opens: remember the meter in
         effect. Sections are parsed one after another, but every parallel

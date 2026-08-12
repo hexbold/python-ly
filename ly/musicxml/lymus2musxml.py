@@ -712,6 +712,15 @@ class ParseSource():
                 # collides with the staff's real voices (double-booked voice,
                 # MuseScore rejects the file)
                 pass
+            elif self.mediator.stream_has_music():
+                # a \voiceX AFTER the stream already carries music (e.g.
+                # cross-staff travel: \change Staff = ".." \voiceThree) is a
+                # print directive — stems/rests on the destination staff. A
+                # MusicXML voice is the STREAM's identity: renumbering it
+                # mid-measure double-books a sibling's number or flips
+                # numbers inside one backup stream, and MuseScore rejects
+                # the file (exit 40)
+                pass
             else:
                 self.mediator.set_voicenr(command.token[1:],
                                           piano=self.piano_staff)
