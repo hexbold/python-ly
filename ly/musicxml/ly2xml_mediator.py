@@ -119,6 +119,10 @@ class Mediator():
         self.tupl_dur = 0
         self.tupl_sum = 0
         self.slur_stack = []
+        self.prev_slurrable = None
+        self.snippet_state = []
+        self.tied_pitches = set()
+        self.chord_tie_stops = set()
         self.multiple_rest = False
         self.multiple_rest_bar = None
         self.current_mark = 1
@@ -281,6 +285,44 @@ class Mediator():
             if staff_id in self.staff_unset_notes:
                 for n in self.staff_unset_notes[staff_id]:
                     n.staff = self.staff
+
+    def open_snippet_block(self):
+        r"""Start of an inline ``<< .. \\ .. >>`` polyphony block, called with
+        its sim-snip on top of the section stack.
+
+        bar_dura is a single global accumulator: without saving it, branch
+        durations pile onto the enclosing bar's fill state, every branch
+        after the first starts at the wrong position, and the bars after
+        the block close early (spurious short measures; in multi-staff
+        parts the pairwise staff merge then truncates to the shortest
+        staff). The state is a stack so blocks may nest."""
+        self.snippet_state.append(
+            (self.bar_dura, self.voice, len(self.sections)))
+
+    def next_snippet_branch(self):
+        r"""A \\ separator: the new branch restarts at the block's start."""
+        if self.snippet_state:
+            self.bar_dura = self.snippet_state[-1][0]
+
+    def close_snippet_block(self):
+        r"""End of a ``<< .. \\ .. >>`` block: merge the branch snippets into
+        the enclosing bar and restore the voice number. bar_dura keeps the
+        last branch's end position, so music following the block continues
+        the same bar at the right beat.
+
+        Branches are folded by SECTION DEPTH, never by voice-number delta:
+        a \voiceOne..\voiceFour inside a branch changes the voice number
+        arbitrarily, which made the upstream count merge one level too far
+        and pour the block into the enclosing staff's first bars."""
+        dura_start, voice_start, depth = self.snippet_state.pop()
+        while len(self.sections) > depth:
+            self.check_voices()
+        if self.sections and isinstance(self.sections[-1], xml_objs.Snippet):
+            self.add_snippet(self.sections[-1].name)
+            self.sections.pop()
+        else:
+            print("WARNING: problem adding snippet!")
+        self.voice = voice_start
 
     def add_snippet(self, snippet_name):
         """ Adds snippet to previous barlist.
@@ -656,6 +698,7 @@ class Mediator():
             self.current_note = self.create_barnote_from_note(note)
             self.current_lynote = note
             self.check_current_note(rel)
+        self.prev_slurrable = self.current_note
         if self.stem_dir:
             self.current_note.set_stem_direction(self.stem_dir)
         self.do_action_onnext(self.current_note)
@@ -684,7 +727,7 @@ class Mediator():
     def create_unpitched(self, unpitched):
         """Create a xml_objs.Unpitched from ly.music.items.Unpitched."""
         dura = unpitched.duration
-        return xml_objs.Unpitched(dura)
+        return xml_objs.Unpitched(dura, voice=self.voice)
 
     def create_barnote_from_note(self, note):
         """Create a xml_objs.BarNote from ly.music.items.Note."""
@@ -730,8 +773,16 @@ class Mediator():
             self.set_octave(rel)
         if not rest:
             if self.tied:
-                self.current_note.set_tie('stop')
+                key = self._tie_key(self.current_note)
+                if not self.tied_pitches or key in self.tied_pitches:
+                    self.current_note.set_tie('stop')
+                # chord members are created after their base: remember which
+                # pitches may still take the stop
+                self.chord_tie_stops = self.tied_pitches
                 self.tied = False
+                self.tied_pitches = set()
+            else:
+                self.chord_tie_stops = set()
             self.current_note.auto_beam = self.auto_beaming
         self.check_duration(rest)
         self.check_divs()
@@ -811,7 +862,6 @@ class Mediator():
         chord_note.set_duration(self.current_note.duration)
         chord_note.set_durtype(durval2type(self.dur_token))
         chord_note.dots = self.dots
-        chord_note.tie = self.current_note.tie
         chord_note.tuplet = self.current_note.tuplet
         if not self.prev_chord_pitch:
             self.prev_chord_pitch = self.prev_pitch
@@ -821,6 +871,9 @@ class Mediator():
         chord_note.set_octave(p.octave + 3)
         self.prev_chord_pitch = p
         chord_note.chord = True
+        # the tie stop reaches only members whose pitch was actually tied
+        if self.chord_tie_stops and self._tie_key(chord_note) in self.chord_tie_stops:
+            chord_note.set_tie('stop')
         if self.staff:
             chord_note.set_staff(self.staff)
         self._chord_bar.add(chord_note)  # Use saved bar ref (not self.bar which may have advanced)
@@ -936,7 +989,13 @@ class Mediator():
             self.current_note.set_tuplet(tfraction, ttype, nr)
 
     def change_tuplet_type(self, index, newtype):
-        self.current_note.tuplet[index].ttype = newtype
+        try:
+            self.current_note.tuplet[index].ttype = newtype
+        except IndexError:
+            # tuplet closing on an event that carries no tuplet attributes
+            # (e.g. a whole-measure R inside \tuplet); losing the stop marker
+            # is preferable to crashing the export
+            print("Warning: tuplet %s marker could not be placed!" % newtype)
 
     def set_tuplspan_dur(self, token=None, tokens=None, fraction=None):
         """
@@ -960,10 +1019,24 @@ class Mediator():
         fraction and duration of tuplet."""
         return tfraction[1] / length
 
+    @staticmethod
+    def _tie_key(barnote):
+        """Pitch identity for tie pairing: a tie connects EQUAL pitches only
+        (LilyPond ties c~ to the c of a following chord, never to its other
+        members)."""
+        return (getattr(barnote, 'base_note', None),
+                getattr(barnote, 'alter', None),
+                getattr(barnote, 'octave', None))
+
     def tie_to_next(self, src=None):
-        tie_type = 'start'
+        # for a chord, every member is tied (set explicitly — the members
+        # already exist when the ~ arrives)
+        targets = self.current_chord if self.current_chord else [self.current_note]
+        for t in targets:
+            if 'start' not in t.tie:
+                t.set_tie('start')
         self.tied = True
-        self.current_note.set_tie(tie_type)
+        self.tied_pitches = {self._tie_key(t) for t in targets}
         self._record_attach('tie', '~', src)
 
     def set_slur(self, nr, slur_type, phrasing=False, src=None):
@@ -975,13 +1048,25 @@ class Mediator():
         slur_start = None
 
         if slur_type == 'stop':
+            if not self.slur_stack:
+                print("Warning: slur stop without a start — ignored!")
+                return
             slur_start = self.slur_stack.pop()
 
-        self.current_note.set_slur(nr, slur_type, phrasing, slur_start)
+        target = self.current_note
+        if not hasattr(target, 'set_slur'):
+            # LilyPond allows a slur to close (or open) on a rest, MusicXML
+            # does not: the engraved slur ends on the last sounding note, so
+            # attach it there instead of crashing on BarRest
+            target = self.prev_slurrable
+        if target is None:
+            print("Warning: no note to attach slur to — dropped!")
+            return
+        target.set_slur(nr, slur_type, phrasing, slur_start)
         self._record_attach('slur', slur_type, src)
 
         if slur_type == 'start':
-            self.slur_stack.append(self.current_note.slur[-1])
+            self.slur_stack.append(target.slur[-1])
 
     def set_manual_beam(self, token):
         """Set a manual beam '[' or ']' on the current note, overriding auto beaming."""
@@ -1259,7 +1344,12 @@ class Mediator():
         c = a * divs * scaling
         predur, mod = divmod(c, b)
         if mod > 0:
-            mult = get_mult(a, b)
+            # the minimal factor making THIS duration integral must include
+            # the scaling (e.g. a *8/9 multiplier) and the current divisions:
+            # get_mult(a, b) ignored both, so every scaled note re-multiplied
+            # divisions without ever becoming compatible — exponential
+            # divisions blow-up on pieces using duration multipliers
+            mult = (Fraction(c) / Fraction(b)).denominator
             self.divisions = divs*mult
 
     def add_break(self):

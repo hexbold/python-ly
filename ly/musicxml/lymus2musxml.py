@@ -120,7 +120,7 @@ class ParseSource():
         self.trem_notes = 1
         self.piano_staff = 0
         self.numericTime = False
-        self.voice_sep = False
+        self.voice_sep = 0    # depth counter: << .. \\ .. >> blocks may nest
         self.sims_and_seqs = []
         self.override_dict = {}
         self.ottava = False
@@ -279,7 +279,8 @@ class ParseSource():
         if musicList.token == '<<':
             if self.look_ahead(musicList, ly.music.items.VoiceSeparator):
                 self.mediator.new_snippet('sim-snip')
-                self.voice_sep = True
+                self.mediator.open_snippet_block()
+                self.voice_sep += 1
             elif self.sim_is_container(musicList):
                 # container of staves/groups: no music section of its own
                 pass
@@ -343,6 +344,7 @@ class ParseSource():
     def VoiceSeparator(self, voice_sep):
         self.mediator.new_snippet('sim')
         self.mediator.set_voicenr(add=True)
+        self.mediator.next_snippet_branch()
 
     def Change(self, change):
         r""" A \change music expression. Changes the staff number. """
@@ -425,6 +427,9 @@ class ParseSource():
 
     def Unpitched(self, unpitched):
         """A note without pitch, just a standalone duration."""
+        if getattr(self, 'after_skip_dur', False):
+            self.after_skip_dur = False   # the duration argument of \after
+            return
         if unpitched.length():
             if self.alt_mode == 'drum':
                 self.mediator.new_iso_dura(unpitched, self.relative, True,
@@ -518,6 +523,9 @@ class ParseSource():
         if rest.token == 'R':
             self.scale = 'R'
         self.mediator.new_rest(rest, tupl_factor=self.tuplet_factor())
+        # rests inside a tuplet carry <time-modification> and may be the
+        # tuplet's last event (the stop marker lands on them)
+        self.check_tuplet()
 
     def Skip(self, skip):
         r""" invisible rest/spacer rest (s or command \skip)"""
@@ -525,6 +533,7 @@ class ParseSource():
             self.mediator.new_lyrics_item(skip.token)
         else:
             self.mediator.new_rest(skip, tupl_factor=self.tuplet_factor())
+            self.check_tuplet()
 
     def Scaler(self, scaler):
         r"""
@@ -655,14 +664,28 @@ class ParseSource():
     def Command(self, command):
         r""" \bar, \rest etc """
         excls = ['\\major', '\\minor', '\\dorian', '\\bar']
-        if command.token == '\\rest':
+        if command.token == '\\after':
+            # \after DURATION EVENT MUSIC delays an attachment; the bare
+            # duration must NOT become a repeated-pitch note (it inserted
+            # phantom time and shifted the rest of the voice)
+            self.after_skip_dur = True
+        elif command.token == '\\rest':
             self.mediator.note2rest()
         elif command.token == '\\numericTimeSignature':
             self.numericTime = True
         elif command.token == '\\defaultTimeSignature':
             self.numericTime = False
         elif command.token.find('voice') == 1:
-            self.mediator.set_voicenr(command.token[1:], piano=self.piano_staff)
+            if self.voice_sep:
+                # inside a << .. \\ .. >> branch \voiceOne..\voiceFour only
+                # directs stems/rests — LilyPond spawns a FRESH Voice context
+                # per branch, so remapping the MusicXML voice number here
+                # collides with the staff's real voices (double-booked voice,
+                # MuseScore rejects the file)
+                pass
+            else:
+                self.mediator.set_voicenr(command.token[1:],
+                                          piano=self.piano_staff)
         elif command.token == '\\glissando':
             try:
                 self.mediator.new_gliss(self.override_dict["Glissando.style"])
@@ -876,9 +899,8 @@ class ParseSource():
                 self.mediator.check_voices()
         elif end.node.token == '<<':
             if self.voice_sep:
-                self.mediator.check_voices_by_nr()
-                self.mediator.revert_voicenr()
-                self.voice_sep = False
+                self.mediator.close_snippet_block()
+                self.voice_sep -= 1
             elif self.sim_is_container(end.node):
                 # structural << >>: no section was opened, nothing to close
                 pass

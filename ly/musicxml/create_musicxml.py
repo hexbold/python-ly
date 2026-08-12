@@ -73,6 +73,16 @@ class CreateMusicXML():
         mov_title.text = title
         self.root.insert(0, mov_title)
 
+    def create_work_number(self, opus):
+        """<work><work-number>: the score-header slot for catalogue numbers
+        (LilyPond \\header opus). <work> precedes <movement-title>."""
+        work = self.root.find("work")
+        if work is None:
+            work = etree.Element("work")
+            self.root.insert(0, work)
+        number = etree.SubElement(work, "work-number")
+        number.text = opus
+
     def create_credits(self, title, subtitle, creators):
         """Create <credit> blocks for the page header (title, subtitle, composer,
         lyricist, arranger). Renderers that draw the header from credits (Verovio,
@@ -486,6 +496,12 @@ class CreateMusicXML():
             index = get_tag_index(self.current_note, "dot")
         if index == -1:
             index = get_tag_index(self.current_note, "type")
+        if index == -1:
+            # typeless notes (invisible skip rests): time-modification still
+            # belongs after voice/duration, never at position 0 before <rest>
+            index = get_tag_index(self.current_note, "voice")
+        if index == -1:
+            index = get_tag_index(self.current_note, "duration")
         timemod_node = etree.Element("time-modification")
         actual_notes = etree.SubElement(timemod_node, "actual-notes")
         actual_notes.text = str(fraction[0])

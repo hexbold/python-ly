@@ -485,3 +485,54 @@ def test_after_grace_with_articulation():
     # the trill survives on the main note
     assert len(root.findall(".//trill-mark")) == 1
     validate_xml(output)
+
+
+def test_tuplet_ending_in_rest():
+    r"""A tuplet whose last event is a rest or spacer: the stop marker lands
+    on the rest (used to raise IndexError and kill the export), and rests
+    inside tuplets carry <time-modification> like notes."""
+    compare_output('tuplet_rest')
+
+
+def test_slur_stop_on_rest():
+    r"""LilyPond allows c( d r) — MusicXML slurs attach to notes only, so
+    the stop moves to the last sounding note (used to crash: BarRest has no
+    set_slur)."""
+    compare_output('slur_on_rest')
+
+
+def test_tie_into_chord():
+    r"""c'~ <c' e'> ties ONLY the matching pitch: the other chord member
+    used to inherit a spurious tie stop via the shared tie list. Chord-to-
+    chord ties still tie every member."""
+    compare_output('tie_into_chord')
+
+
+def test_inline_polyphony_bar_accounting():
+    r"""<< .. \\ .. >> inside a voice: bar_dura is saved per block and each
+    branch restarts at the block's start, so music after the block continues
+    its bar and later bars close on time. Also covers nesting, a shorter
+    first branch (list_full propagation through merge_voice) and the
+    PianoStaff staff merge that used to truncate to the shortest staff.
+    \voiceX inside a branch no longer remaps the MusicXML voice number
+    (double-booked voices made MuseScore reject the file)."""
+    compare_output('polyphony_inline')
+
+
+def test_header_opus_is_work_number():
+    r"""\header opus lands in <work><work-number>, not in <identification>
+    (schema-invalid there — MuseScore refused every file carrying it)."""
+    compare_output('header_opus')
+
+
+def test_after_command_duration_not_a_note():
+    r"""\after DUR EVENT MUSIC: the bare duration argument must not become
+    a repeated-pitch note (phantom time shifted the whole voice)."""
+    compare_output('after_command')
+
+
+def test_duration_multiplier_divisions():
+    r"""Duration multipliers like *8/9 pick the minimal divisions growth:
+    the old factor ignored scaling, so every scaled note re-multiplied
+    divisions — 70-digit divisions that no reader could parse."""
+    compare_output('duration_multipliers')

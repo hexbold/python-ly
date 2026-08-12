@@ -83,6 +83,11 @@ class IterateXmlObjs():
                 # <identification> has no such element (schema-invalid there);
                 # the subtitle appears on the page via its <credit> block below
                 continue
+            if itag == "opus":
+                # catalogue numbers live in <work><work-number>, never in
+                # <identification> (schema-invalid there, MuseScore rejects)
+                self.musxml.create_work_number(score.info[itag])
+                continue
             self.musxml.create_score_info(itag, score.info[itag])
         if score.rights:
             if len(score.rights) > 1:
@@ -510,6 +515,11 @@ class ScoreSection():
         """Merge in other ScoreSection."""
         for org_v, add_v in zip(self.barlist, voice.barlist):
             org_v.inject_voice(add_v, override, self.active_slur_count)
+            # a bar is complete when EITHER voice completed it — the branches
+            # of << .. \\ .. >> may be unequal (voice 1 ending early), and a
+            # lost full-marker here made the following music continue inside
+            # the same measure
+            org_v.list_full = org_v.list_full or add_v.list_full
         bl_len = len(self.barlist)
         if len(voice.barlist) > bl_len:
             self.barlist += voice.barlist[bl_len:]
@@ -1000,7 +1010,7 @@ class BarNote(BarMus):
 class Unpitched(BarNote):
     """Object to keep track of unpitched notes."""
     def __init__(self, duration, step=None, voice=1):
-        BarNote.__init__(self, 'B', 0, "", duration, voice=1)
+        BarNote.__init__(self, 'B', 0, "", duration, voice=voice)
         self.octave = 4
         if step:
             self.base_note = step.upper()
