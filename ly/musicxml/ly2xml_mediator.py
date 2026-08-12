@@ -474,7 +474,14 @@ class Mediator():
         until a full bar is reached, shifting EVERY later barline.
         Pre-filling bar_dura with the missing part of the measure makes
         the pickup bar close after exactly `length` of music.
+
+        A \partial may also appear MID-piece (an upbeat opening the next
+        \repeat volta while the previous block ends on the complementary
+        short measure): the open short bar must close here, or it swallows
+        the upbeat into one overfull measure.
         """
+        if self.bar is not None and self.bar.has_music():
+            self.new_bar()          # close the short measure before the upbeat
         if self.bar is not None and not self.bar.has_music():
             self.bar.pickup = True
         else:
@@ -929,7 +936,12 @@ class Mediator():
         self.increase_bar_dura(dur, tupl_factor)
 
     def note2rest(self):
-        """Note used as rest position transformed to rest."""
+        """Note used as rest position transformed to rest.
+
+        The \\rest command arrives AFTER its note; if that note just filled
+        the measure, self.bar has already moved on — popping there destroyed
+        the fresh bar's attributes and left the note a sounding pitch."""
+        bar = self.current_note_bar or self.bar
         dur = self.current_note.duration
         voice = self.current_note.voice
         pos = [self.current_note.base_note, self.current_note.octave]
@@ -937,8 +949,9 @@ class Mediator():
         self.current_note = xml_objs.BarRest(dur, voice, pos=pos)
         self.current_note.src = src
         self.check_duration(rest=True)
-        self.bar.obj_list.pop()
-        self.bar.add(self.current_note)
+        if bar.obj_list and bar.obj_list[-1] is not self.current_note:
+            bar.obj_list.pop()
+        bar.add(self.current_note)
 
     def set_mult_rest(self):
         self.multiple_rest = True

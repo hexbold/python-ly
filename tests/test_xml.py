@@ -536,3 +536,18 @@ def test_duration_multiplier_divisions():
     the old factor ignored scaling, so every scaled note re-multiplied
     divisions — 70-digit divisions that no reader could parse."""
     compare_output('duration_multipliers')
+
+
+def test_pitched_rest_closing_its_bar():
+    r"""The \rest command arrives after its note; when that note just filled
+    the measure, self.bar has moved on — popping there destroyed the fresh
+    bar's attributes and left the note a sounding pitch."""
+    compare_output('rest_pitched_barend')
+
+
+def test_partial_midpiece_between_repeats():
+    r"""An upbeat opening the SECOND \repeat volta (first block ends on the
+    complementary short measure): \partial must close the open short bar,
+    or both merge into one overfull measure and every later barline
+    shifts."""
+    compare_output('partial_midpiece')
