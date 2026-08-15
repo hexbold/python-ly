@@ -61,6 +61,7 @@ class CreateMusicXML():
         encoding_date.text = str(datetime.date.today())
         self.partlist = etree.SubElement(self.root, "part-list")
         self.part_count = 1
+        self.pitched_part_count = 0  # GM channel allocation for pitched parts (skips channel 10)
         self.direction = None
 
     ##
@@ -144,6 +145,22 @@ class CreateMusicXML():
             group_symbol = etree.SubElement(partgroup, "group-symbol")
             group_symbol.text = symbol
 
+    def _alloc_midi_channel(self, midi_name):
+        """GM midi-channel for a part. Channel 10 is KIT PERCUSSION in General MIDI: a melodic
+        part landing there plays as drums in every consumer (MuseScore audio, mixers, soft
+        synths) — the "part 10 = drums" bug. Every named midiInstrument carries a GM melodic
+        program (even bass drum/timpani: GM 113-120 are melodic percussion programs), so all
+        get sequential channels SKIPPING 10 — 1-9, 11-16, wrapping past 16 (channel reuse is
+        harmless: consumers key program changes per channel in part order). Channel 10 stays
+        reserved for a future true drum-kit part: a drum.* sound with NO melodic program."""
+        sound = midi_sound_map.get(midi_name) or ""
+        if sound.startswith("drum.") and midi_name not in midi_program_map:
+            return 10
+        n = self.pitched_part_count
+        self.pitched_part_count += 1
+        ch = n % 15  # 15 usable channels: 1-16 without 10
+        return ch + 1 if ch < 9 else ch + 2
+
     def create_part(self, name="unnamed", abbr=False, midi=False):
         """Create a new part """
         strnr = str(self.part_count)
@@ -164,7 +181,7 @@ class CreateMusicXML():
 
             midiinstr = etree.SubElement(part, "midi-instrument", id="P"+strnr+"-I"+strnr)
             midich = etree.SubElement(midiinstr, "midi-channel")
-            midich.text = strnr
+            midich.text = str(self._alloc_midi_channel(midi))
             if midi in midi_program_map:
                 midiprog = etree.SubElement(midiinstr, "midi-program")
                 midiprog.text = str(midi_program_map[midi])

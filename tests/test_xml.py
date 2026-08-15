@@ -603,3 +603,13 @@ def test_tie_prune_dangling():
     rest dies; a grace between a tie and its target neither consumes nor
     stops it (the stop used to be lost)."""
     compare_output('tie_prune_dangling')
+
+
+def test_midi_channel_skip_percussion():
+    r"""midi-channel was the raw part NUMBER, so part 10 of any 10+-part
+    score (a symphony's double bass) landed on GM channel 10 - KIT
+    PERCUSSION - and played as drums in every consumer (MuseScore audio,
+    mixers). Melodic parts now number 1-9, 11-16 (channel 10 skipped);
+    timpani/bass drum etc. are GM MELODIC programs (48, 113-120), not kit
+    percussion, so they skip it too."""
+    compare_output('midi_channel_skip_percussion')
