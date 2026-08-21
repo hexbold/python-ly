@@ -140,18 +140,18 @@ class Constant(Word):
 
 class Number(_token.Item, _token.Numeric):
     rx = (r"("
-          r"-?\d+|"
+          r"-?[0-9]+|"
           r"#(b[0-1]+|o[0-7]+|x[0-9a-fA-F]+)|"
           r"[-+]inf.0|[-+]?nan.0"
           r")(?=$|[)\s])")
 
 
 class Fraction(Number):
-    rx = r"-?\d+/\d+(?=$|[)\s])"
+    rx = r"-?[0-9]+/[0-9]+(?=$|[)\s])"
 
 
 class Float(Number):
-    rx = r"-?((\d+(\.\d*)|\.\d+)(E\d+)?)(?=$|[)\s])"
+    rx = r"-?(([0-9]+(\.[0-9]*)|\.[0-9]+)(E[0-9]+)?)(?=$|[)\s])"
 
 
 class VectorStart(OpenParen):

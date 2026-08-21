@@ -45,7 +45,7 @@ re_dynamic = (
 re_duration = rf"(\\(maxima|longa|breve){re_identifier_end}|(1|2|4|8|16|32|64|128|256|512|1024|2048)(?!\d))"
 
 re_dot = r"\."
-re_scaling = r"\*[\t ]*\d+(/\d+)?"
+re_scaling = r"\*[\t ]*[0-9]+(/[0-9]+)?"
 
 
 
@@ -72,15 +72,15 @@ class Value(_token.Item, _token.Numeric):
 
 
 class DecimalValue(Value):
-    rx = r"-?\d+(\.\d+)?"
+    rx = r"-?[0-9]+(\.[0-9]+)?"
 
 
 class IntegerValue(DecimalValue):
-    rx = r"\d+"
+    rx = r"[0-9]+"
 
 
 class Fraction(Value):
-    rx = r"\d+/\d+"
+    rx = r"[0-9]+/[0-9]+"
 
 
 class Delimiter(_token.Token):
@@ -289,11 +289,11 @@ class ScriptAbbreviation(Articulation, _token.Leaver):
 
 
 class Fingering(Articulation, _token.Leaver):
-    rx = r"\d+"
+    rx = r"[0-9]+"
 
 
 class StringNumber(Articulation):
-    rx = r"\\\d+"
+    rx = r"\\[0-9]+"
 
 
 class Slur(_token.Token):
@@ -379,7 +379,7 @@ class ChordSeparator(ChordItem):
 
 
 class ChordStepNumber(ChordItem):
-    rx = r"\d+[-+]?"
+    rx = r"[0-9]+[-+]?"
 
 
 class DotChord(ChordItem):
@@ -571,7 +571,7 @@ class Tempo(Command):
 
 
 class TempoSeparator(Delimiter):
-    rx = r"[-~](?=\s*\d)"
+    rx = r"[-~](?=\s*[0-9])"
 
 
 class Partial(Command):
@@ -740,7 +740,7 @@ class FigureBracket(Figure):
 
 class FigureStep(Figure):
     """A step figure number or the underscore."""
-    rx = r"_|\d+"
+    rx = r"_|[0-9]+"
 
 
 class FigureAccidental(Figure):
