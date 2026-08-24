@@ -28,6 +28,9 @@ import itertools
 from . import _token
 from . import Parser, FallthroughParser
 
+# digit patterns use [0-9]: \d also matches Unicode digits that are not legal
+# LilyPond. \d in a negated class excludes those too, so it stays
+
 # an identifier allowing letters and single hyphens in between
 re_identifier = r"[^\W\d_]+([_-][^\W\d_]+)*"
 

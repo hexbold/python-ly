@@ -138,6 +138,7 @@ class Constant(Word):
         return match.group() in data.scheme_constants()
 
 
+# [0-9], not \d, which also matches Unicode digits that are not legal LilyPond
 class Number(_token.Item, _token.Numeric):
     rx = (r"("
           r"-?[0-9]+|"
