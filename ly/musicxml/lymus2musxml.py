@@ -121,6 +121,9 @@ class ParseSource():
         self.piano_staff = 0
         self.numericTime = False
         self.voice_sep = 0    # depth counter: << .. \\ .. >> blocks may nest
+        self.snippet_blocks = []
+        self.inline_voice_contexts = {}
+        self.inline_voice_blocks = {}
         self.sims_and_seqs = []
         self.override_dict = {}
         self.ottava = False
@@ -176,6 +179,7 @@ class ParseSource():
     def parse_tree(self, mustree):
         """Parse the LilyPond source as a ly.music node tree."""
         # print(mustree.dump())
+        self.music_tree = mustree
         self.reserve_explicit_voices(mustree)
         header_nodes = self.iter_header(mustree)
         if header_nodes:
@@ -218,6 +222,8 @@ class ParseSource():
         if nodes:
             for m in nodes:
                 # print(m)
+                if m in self.inline_voice_contexts:
+                    self.begin_inline_branch(m)
                 func_name = m.__class__.__name__ #get instance name
                 if func_name not in excl_list:
                     try:
@@ -302,10 +308,39 @@ class ParseSource():
 
     def MusicList(self, musicList):
         if musicList.token == '<<':
-            if self.look_ahead(musicList, ly.music.items.VoiceSeparator):
+            voices = [n for n in musicList
+                      if isinstance(n, ly.music.items.Context)
+                      and n.context() == 'Voice']
+            branches = [self.music_tree.substitute_for_node(n) or n
+                        for n in musicList if isinstance(n, ly.music.items.Music)
+                        and (not isinstance(n, ly.music.items.Context) or n in voices)]
+            parent = musicList.parent()
+            # Staff-wide voices merge from measure one. A voice group in a
+            # sequential stream instead starts at the current cursor and must
+            # return that cursor to its enclosing stream when it ends.
+            sequential = (isinstance(parent, ly.music.items.MusicList)
+                          and parent.token == '{'
+                          and any(n is not musicList and isinstance(
+                              n, (ly.music.items.Durable, ly.music.items.Music))
+                                  for n in parent))
+            inline_voices = (voices and not self.sim_is_container(musicList)
+                             and (sequential or self.voice_sep
+                                  or self.mediator.stream_has_music()))
+            if (self.look_ahead(musicList, ly.music.items.VoiceSeparator)
+                    or inline_voices):
                 self.mediator.new_snippet('sim-snip')
                 self.mediator.open_snippet_block()
                 self.voice_sep += 1
+                self.snippet_blocks.append(musicList)
+                if inline_voices:
+                    self.inline_voice_blocks[musicList] = {
+                        'staff': self.mediator.staff,
+                        'meter': self.mediator.current_time,
+                        'length': -1,
+                        'max_length': max(branch.length() for branch in branches),
+                    }
+                for i, branch in enumerate(branches if inline_voices else []):
+                    self.inline_voice_contexts.setdefault(branch, []).append((musicList, i))
             elif self.sim_is_container(musicList):
                 # container of staves/groups: no music section of its own
                 pass
@@ -330,7 +365,44 @@ class ParseSource():
     def Context(self, context):
         r""" \context """
         self.in_context = True
+        if context in self.inline_voice_contexts:
+            self.sims_and_seqs.append('voice')
+            if context.context_id():
+                self.mediator.named_sections.setdefault(
+                    context.context_id(), self.mediator.insert_into)
+            return
         self.check_context(context.context(), context.context_id(), context.token)
+
+    def begin_inline_branch(self, node):
+        if node not in self.inline_voice_contexts:
+            return False
+        block, index = self.inline_voice_contexts[node][0]
+        state = self.inline_voice_blocks[block]
+        if index:
+            self.mediator.new_snippet('sim')
+            self.mediator.set_voicenr(add=True)
+            self.mediator.next_snippet_branch()
+        self.mediator.staff = state['staff']
+        self.mediator.current_time = state['meter']
+        return True
+
+    def end_inline_branch(self, node):
+        bindings = self.inline_voice_contexts[node]
+        block, index = bindings.pop(0)
+        if not bindings:
+            del self.inline_voice_contexts[node]
+        state = self.inline_voice_blocks[block]
+        # Simultaneous music lasts as long as its longest branch, regardless
+        # of which branch happened to be parsed last.
+        length = node.length()
+        self.mediator.pad_snippet_branch(
+            (state['max_length'] - length) / self.tuplet_factor())
+        if length >= state['length']:
+            state['length'] = length
+            state['end_dura'] = self.mediator.bar_dura
+            state['end_meter'] = self.mediator.current_time
+        if isinstance(node, ly.music.items.Context):
+            self.mediator.preserve_named_voice(node.context_id())
 
     def check_context(self, context, context_id=None, token=""):
         """Check context and do appropriate action (e.g. create new part)."""
@@ -889,6 +961,7 @@ class ParseSource():
         pass
 
     def End(self, end):
+        inline_branch = end.node in self.inline_voice_contexts
         if isinstance(end.node, ly.music.items.Transpose):
             if self.mediator.transposers:
                 self.mediator.transposers.pop()
@@ -921,7 +994,8 @@ class ParseSource():
         elif isinstance(end.node, ly.music.items.Context):
             self.in_context = False
             if end.node.context() == 'Voice':
-                self.mediator.check_voices()
+                if not inline_branch:
+                    self.mediator.check_voices()
                 self.sims_and_seqs.pop()
             elif end.node.context() in group_contexts:
                 self.mediator.close_group()
@@ -936,9 +1010,15 @@ class ParseSource():
             elif end.node.context() == 'Devnull':
                 self.mediator.check_voices()
         elif end.node.token == '<<':
-            if self.voice_sep:
+            if self.snippet_blocks and self.snippet_blocks[-1] is end.node:
                 self.mediator.close_snippet_block()
                 self.voice_sep -= 1
+                self.snippet_blocks.pop()
+                state = self.inline_voice_blocks.pop(end.node, None)
+                if state is not None:
+                    self.mediator.bar_dura = state['end_dura']
+                    self.mediator.current_time = state['end_meter']
+                    self.mediator.staff = state['staff']
             elif self.sim_is_container(end.node):
                 # structural << >>: no section was opened, nothing to close
                 pass
@@ -974,6 +1054,8 @@ class ParseSource():
         else:
             # print("end:", end.node.token)
             pass
+        if inline_branch:
+            self.end_inline_branch(end.node)
 
     ##
     # Additional node manipulation

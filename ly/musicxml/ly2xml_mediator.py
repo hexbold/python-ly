@@ -27,6 +27,7 @@ from __future__ import print_function
 from __future__ import division
 
 from fractions import Fraction
+from copy import copy
 
 import ly.duration
 import ly.music.items
@@ -121,6 +122,7 @@ class Mediator():
         self.slur_stack = []
         self.prev_slurrable = None
         self.snippet_state = []
+        self.snippet_voice_numbers = []
         self.reserved_voicenrs = set()
         self.simultan_time_stack = []
         self.tied_pitches = set()
@@ -263,9 +265,12 @@ class Mediator():
             # reserve_explicit_voices) so the branch never double-books a
             # sibling voice's number
             nxt = self.voice + 1
-            while nxt in self.reserved_voicenrs:
+            while (nxt in self.reserved_voicenrs
+                   or any(nxt in used for used in self.snippet_voice_numbers)):
                 nxt += 1
             self.voice = nxt
+            for used in self.snippet_voice_numbers:
+                used.add(nxt)
         elif nr:
             self.voice = nr
         else:
@@ -310,6 +315,7 @@ class Mediator():
         staff). The state is a stack so blocks may nest."""
         self.snippet_state.append(
             (self.bar_dura, self.voice, len(self.sections)))
+        self.snippet_voice_numbers.append({self.voice})
 
     def next_snippet_branch(self):
         r"""A \\ separator: the new branch restarts at the block's start."""
@@ -327,6 +333,7 @@ class Mediator():
         arbitrarily, which made the upstream count merge one level too far
         and pour the block into the enclosing staff's first bars."""
         dura_start, voice_start, depth = self.snippet_state.pop()
+        self.snippet_voice_numbers.pop()
         while len(self.sections) > depth:
             self.check_voices()
         if self.sections and isinstance(self.sections[-1], xml_objs.Snippet):
@@ -335,6 +342,37 @@ class Mediator():
         else:
             print("WARNING: problem adding snippet!")
         self.voice = voice_start
+
+    def preserve_named_voice(self, name):
+        """Keep a named inline voice available for later \\lyricsto commands.
+
+        Merging snippets adds sibling notes into the first branch's bars.
+        Retain separate bar containers for the named voice but share the note
+        objects, so late lyrics still attach to the emitted notes only.
+        """
+        if not name or name not in self.named_sections:
+            return
+        section = self.named_sections[name]
+        saved = copy(section)
+        saved.barlist = [copy(bar) for bar in section.barlist]
+        for bar in saved.barlist:
+            bar.obj_list = list(bar.obj_list)
+        self.named_sections[name] = saved
+
+    def pad_snippet_branch(self, remaining):
+        """Advance a shorter explicit voice to the simultaneous group's end.
+
+        These synthetic, invisible rests keep MusicXML's serialized cursor at
+        the correct beat for the continuation, including after a bar crossing.
+        They intentionally have no source span.
+        """
+        while remaining > 0:
+            duration = min(remaining, self.current_time - self.bar_dura)
+            rest = xml_objs.BarRest((duration, 1), self.voice, skip=True)
+            rest.staff = self.staff
+            self.add_to_bar(rest)
+            self.increase_bar_dura(rest.duration)
+            remaining -= duration
 
     def add_snippet(self, snippet_name):
         """ Adds snippet to previous barlist.
