@@ -95,8 +95,9 @@ class StringSQEnd(String, _token.StringEnd, _token.Leaver):
     rx = r"'"
 
 
+# [0-9], not \d: a numeric character reference is ASCII digits only
 class EntityRef(_token.Character):
-    rx = r"\&(#\d+|#[xX][0-9A-Fa-f]+|[A-Za-z_:][\w.:_-]*);"
+    rx = r"\&(#[0-9]+|#[xX][0-9A-Fa-f]+|[A-Za-z_:][\w.:_-]*);"
 
 
 class LilyPondTag(Tag):
